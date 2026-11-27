@@ -10,11 +10,13 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
-const { db, recordCollections, listUsers, findUserById, listRecords, upsertRecord, deleteRecord, findRecord, safeUser } = require('./backend/db');
+const { db, recordCollections, listUsers, findUserById, listRecords, recordTeacherId, upsertRecord, deleteRecord, findRecord, safeUser } = require('./backend/db');
 
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET is required in production.');
 const JWT_SECRET = process.env.JWT_SECRET || 'local-development-secret-change-me';
 const COOKIE_NAME = 'mca_session';
+const requestedDemoFee = Math.floor(Number(process.env.DEMO_SEMESTER_FEE_INR));
+const DEMO_SEMESTER_FEE_INR = Number.isSafeInteger(requestedDemoFee) && requestedDemoFee > 0 ? requestedDemoFee : 50000;
 const app = express();
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, 'uploads'));
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -25,6 +27,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: process.env.NODE_ENV === 'test' ? 100 : 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { message: 'Too many login attempts. Try again in 15 minutes.' } });
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: process.env.NODE_ENV === 'test' ? 100 : 5, standardHeaders: 'draft-7', legacyHeaders: false, message: { message: 'Too many accounts registered from this address. Try again later.' } });
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, file, cb) => {
@@ -85,18 +88,48 @@ function matchesFilter(item, query) {
   }
   return true;
 }
+function teacherOwnsSubject(teacherId, subjectId) {
+  return Number(recordTeacherId('subjects', subjectId)) === Number(teacherId);
+}
+function assertTeacherOwnsSubject(req, subjectId) {
+  if (req.user.role === 'teacher' && !teacherOwnsSubject(req.user.id, subjectId)) throw httpError(403, 'You can only manage subjects assigned to your account.');
+}
+function teacherOwnsRecord(req, collection, record, key) {
+  const directOwner = recordTeacherId(collection, key ?? record.id);
+  if (directOwner != null) return Number(directOwner) === Number(req.user.id);
+  if (record.subjectId != null) return teacherOwnsSubject(req.user.id, record.subjectId);
+  if (collection === 'submissions') {
+    const assignment = findRecord('assignments', record.assignmentId);
+    return Boolean(assignment && teacherOwnsSubject(req.user.id, assignment.subjectId));
+  }
+  return false;
+}
+function assertTeacherOwnsRecord(req, collection, record, key) {
+  if (req.user.role === 'teacher' && !teacherOwnsRecord(req, collection, record, key)) throw httpError(403, 'You can only view or change records for your own subjects.');
+}
+function teacherCanSeeStudent(teacherId, student) {
+  const semesters = new Set(listRecords('subjects', teacherId).map(subject => Number(subject.semester)));
+  return semesters.has(Number(student.semester));
+}
 function collectionRead(req, collection) {
-  if (collection === 'students') return listUsers('student').filter(user => req.user.role === 'teacher' || user.id === req.user.id).filter(x => matchesFilter(x, req.query));
-  if (collection === 'teachers') return listUsers('teacher').filter(x => req.user.role === 'teacher' || x.id === req.user.id);
+  if (collection === 'students') return listUsers('student')
+    .filter(user => req.user.role === 'teacher' ? teacherCanSeeStudent(req.user.id, user) : user.id === req.user.id)
+    .filter(user => matchesFilter(user, req.query));
+  if (collection === 'teachers') return listUsers('teacher').filter(user => user.id === req.user.id);
   if (!recordCollections[collection]) throw httpError(404, 'Unknown resource.');
-  let records = listRecords(collection);
-  if (req.user.role === 'student' && collection === 'submissions') records = records.filter(x => x.studentId === req.user.id);
-  if (req.user.role === 'student' && ['attendance','quizzes','internals','endSems','labMarks'].includes(collection)) records = records.filter(x => x.studentId === req.user.id);
+  let records = listRecords(collection, req.user.role === 'teacher' ? req.user.id : null);
+  if (req.user.role === 'student' && ['submissions','attendance','attendanceSessions','quizzes','internals','endSems','labMarks','fees','feePayments'].includes(collection)) records = records.filter(item => Number(item.studentId) === Number(req.user.id));
   records = records.filter(item => matchesFilter(item, req.query));
   if (collection === 'attendance') records = records.map(item => ({ ...item, percentage: item.totalClasses ? Math.round(item.attendedClasses / item.totalClasses * 10000) / 100 : 0 }));
+  if (collection === 'timetable') records = records.map(item => {
+    const subject = findRecord('subjects', item.subjectId);
+    const teacherId = recordTeacherId('subjects', item.subjectId);
+    const teacher = teacherId == null ? null : findUserById(teacherId);
+    return { ...item, subjectName: subject?.name || 'Subject', subjectCode: subject?.code || '', teacherName: subject?.faculty || teacher?.name || '', teacherEmail: teacher?.email || '' };
+  });
   return records;
 }
-function saveOne(collection, record, key) { return upsertRecord(collection, record, key); }
+function saveOne(collection, record, key, teacherId = null) { return upsertRecord(collection, record, key, teacherId); }
 function nextRecordId(collection) {
   const maxId = listRecords(collection).reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
   return Math.max(Date.now(), maxId + 1);
@@ -120,8 +153,39 @@ function removeStoredFiles(record) {
   }
 }
 function requireInt(value, label) { const n = number(value); if (!Number.isInteger(n)) throw httpError(400, `${label} must be a whole number.`); return n; }
+function validateTimetableRecord(req, record, excludeId = null) {
+  const subjectId = requireInt(record.subjectId, 'subjectId');
+  const subject = findRecord('subjects', subjectId);
+  if (!subject) throw httpError(404, 'Subject not found.');
+  assertTeacherOwnsSubject(req, subjectId);
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const day = String(record.day || '');
+  const startTime = String(record.startTime || '');
+  const endTime = String(record.endTime || '');
+  const room = String(record.room || '').trim();
+  if (!days.includes(day)) throw httpError(400, 'Choose a valid day of the week.');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) || endTime <= startTime) throw httpError(400, 'Enter a valid 24-hour class time; end time must be after start time.');
+  if (!room || room.length > 80) throw httpError(400, 'Room is required and must be 80 characters or fewer.');
+  const start = Number(startTime.slice(0,2))*60 + Number(startTime.slice(3));
+  const end = Number(endTime.slice(0,2))*60 + Number(endTime.slice(3));
+  for (const scheduled of listRecords('timetable')) {
+    if (String(scheduled.id) === String(excludeId) || scheduled.day !== day) continue;
+    const otherStart = Number(String(scheduled.startTime).slice(0,2))*60 + Number(String(scheduled.startTime).slice(3,5));
+    const otherEnd = Number(String(scheduled.endTime).slice(0,2))*60 + Number(String(scheduled.endTime).slice(3,5));
+    const overlaps = start < otherEnd && otherStart < end;
+    const sameTeacher = recordTeacherId('subjects', scheduled.subjectId) === req.user.id;
+    const sameRoom = String(scheduled.room || '').trim().toLowerCase() === room.toLowerCase();
+    if (overlaps && (sameTeacher || sameRoom)) throw httpError(409, 'This time overlaps another class for you or uses a room that is already booked.');
+  }
+  return { ...record, subjectId, day, startTime, endTime, room };
+}
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', database: 'sqlite' }));
+function issueSession(req, res, user, status = 200) {
+  const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '12h', issuer: 'mca-academic-dashboard' });
+  res.cookie(COOKIE_NAME, token, sessionCookieOptions(req));
+  res.status(status).json({ user, accessToken: token, expiresIn: 43200 });
+}
 app.post('/api/auth/login', loginLimiter, (req, res, next) => {
   try {
     const { identifier, role, password } = req.body || {};
@@ -130,14 +194,80 @@ app.post('/api/auth/login', loginLimiter, (req, res, next) => {
     const candidates = db.prepare('SELECT * FROM users WHERE role=? AND (lower(email)=? OR lower(json_extract(profile_json,\'$.roll\'))=?)').all(role, ident, ident);
     const row = candidates.find(candidate => bcrypt.compareSync(String(password), candidate.password_hash));
     if (!row) throw httpError(401, 'Email/roll number or password is incorrect.');
-    const user = safeUser(row);
-    const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '12h', issuer: 'mca-academic-dashboard' });
-    res.cookie(COOKIE_NAME, token, sessionCookieOptions(req));
-    res.json({ user, accessToken: token, expiresIn: 43200 });
+    issueSession(req, res, safeUser(row));
+  } catch (error) { next(error); }
+});
+app.post('/api/auth/register', registerLimiter, (req, res, next) => {
+  try {
+    const { name, email, password, role = 'student' } = req.body || {};
+    const cleanName = String(name || '').trim().replace(/\s+/g, ' ');
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!['student','teacher'].includes(role)) throw httpError(400, 'Choose a valid account type.');
+    if (cleanName.length < 2 || cleanName.length > 100) throw httpError(400, 'Enter your full name (2–100 characters).');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanEmail.length > 254) throw httpError(400, 'Enter a valid email address.');
+    if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw httpError(400, 'Password must be 8–128 characters.');
+    if (db.prepare('SELECT 1 FROM users WHERE email=? COLLATE NOCASE').get(cleanEmail)) throw httpError(409, 'An account with this email already exists.');
+
+    let profile;
+    if (role === 'student') {
+      const roll = String(req.body.roll || '').trim().toUpperCase();
+      const semester = Number(req.body.semester);
+      if (!/^[A-Z0-9/-]{4,30}$/.test(roll)) throw httpError(400, 'Enter a valid student roll number.');
+      if (!Number.isInteger(semester) || semester < 1 || semester > 4) throw httpError(400, 'Choose a semester from 1 to 4.');
+      if (db.prepare("SELECT 1 FROM users WHERE lower(json_extract(profile_json,'$.roll'))=lower(?)").get(roll)) throw httpError(409, 'That student roll number is already registered.');
+      const avatar = cleanName.split(' ').map(part => part[0]).join('').slice(0,2).toUpperCase();
+      profile = { name: cleanName, email: cleanEmail, role, roll, semester, avatar, program: 'MCA', batch: String(new Date().getFullYear()), cgpa: 0, sgpa: 0 };
+    } else {
+      const configuredBytes = Buffer.from(process.env.TEACHER_REGISTRATION_CODE || '');
+      const suppliedBytes = Buffer.from(String(req.body.inviteCode || ''));
+      if (!configuredBytes.length) throw httpError(403, 'Teacher sign-up is currently by invitation only. Ask the administrator to configure a teacher registration code.');
+      if (suppliedBytes.length !== configuredBytes.length || !require('node:crypto').timingSafeEqual(suppliedBytes, configuredBytes)) throw httpError(403, 'The teacher invitation code is incorrect.');
+      const avatar = cleanName.split(' ').map(part => part[0]).join('').slice(0,2).toUpperCase();
+      profile = { name: cleanName, email: cleanEmail, role, dept: 'Computer Applications', avatar };
+    }
+
+    const id = Number(db.prepare('SELECT COALESCE(MAX(id),0)+1 AS id FROM users').get().id);
+    profile.id = id;
+    const insertAccount = db.transaction(() => {
+      db.prepare('INSERT INTO users(id,name,email,role,password_hash,profile_json) VALUES(?,?,?,?,?,?)')
+        .run(id, cleanName, cleanEmail, role, bcrypt.hashSync(password, 12), JSON.stringify(profile));
+      if (role === 'student') {
+        for (const subject of listRecords('subjects').filter(item => Number(item.semester) === profile.semester)) {
+          saveOne('attendance', { subjectId: subject.id, studentId: id, totalClasses: 0, attendedClasses: 0 }, `${subject.id}:${id}`, recordTeacherId('subjects', subject.id));
+        }
+        saveOne('fees', { id: nextRecordId('fees'), studentId: id, academicYear: `${new Date().getFullYear()}–${String(new Date().getFullYear() + 1).slice(-2)}`, semester: profile.semester, description: 'Semester academic fee (sample invoice)', amountInr: DEMO_SEMESTER_FEE_INR, dueDate: `${new Date().getFullYear()}-12-31`, status: 'due', sample: true });
+      }
+    });
+    insertAccount();
+    issueSession(req, res, profile, 201);
   } catch (error) { next(error); }
 });
 app.post('/api/auth/logout', (req, res) => { const options = sessionCookieOptions(req); delete options.maxAge; res.clearCookie(COOKIE_NAME, options); res.json({ success: true }); });
 app.get('/api/auth/me', auth, (req, res) => res.json({ user: req.user }));
+app.post('/api/fees/:id/demo-pay', auth, requireRole('student'), (req, res, next) => {
+  try {
+    const invoice = findRecord('fees', req.params.id);
+    if (!invoice) throw httpError(404, 'Fee invoice not found.');
+    if (Number(invoice.studentId) !== Number(req.user.id)) throw httpError(403, 'You can only pay your own fee invoice.');
+    if (invoice.status === 'paid') throw httpError(409, 'This invoice has already been paid.');
+    const amountInr = Number(invoice.amountInr);
+    if (!Number.isSafeInteger(amountInr) || amountInr <= 0) throw httpError(400, 'This invoice has an invalid amount.');
+    const id = nextRecordId('feePayments');
+    const payment = {
+      id, invoiceId: invoice.id, studentId: req.user.id, amountInr, status: 'demo-paid',
+      paymentMethod: 'Demo payment (no money charged)', paidAt: new Date().toISOString(),
+      receiptNo: `DEMO-${new Date().getFullYear()}-${String(id).slice(-8)}`
+    };
+    const savePayment = db.transaction(() => {
+      saveOne('feePayments', payment);
+      invoice.status = 'paid';
+      invoice.paidAt = payment.paidAt;
+      saveOne('fees', invoice);
+    });
+    savePayment();
+    res.status(201).json(payment);
+  } catch (error) { next(error); }
+});
 
 app.get('/api/progress', auth, (req, res, next) => {
   try {
@@ -145,8 +275,9 @@ app.get('/api/progress', auth, (req, res, next) => {
     if (!studentId) throw httpError(400, 'studentId is required for teacher requests.');
     const student = findUserById(studentId);
     if (!student || student.role !== 'student') throw httpError(404, 'Student not found.');
-    const subjects = listRecords('subjects').filter(s => !student.semester || Number(s.semester) === Number(student.semester));
-    const attendance = listRecords('attendance').filter(a => a.studentId === studentId);
+    if (req.user.role === 'teacher' && !teacherCanSeeStudent(req.user.id, student)) throw httpError(403, 'This student is not in your assigned subjects.');
+    const subjects = listRecords('subjects', req.user.role === 'teacher' ? req.user.id : null).filter(s => !student.semester || Number(s.semester) === Number(student.semester));
+    const attendance = listRecords('attendance', req.user.role === 'teacher' ? req.user.id : null).filter(a => a.studentId === studentId);
     const progress = subjects.map(subject => {
       const att = attendance.find(a => a.subjectId === subject.id);
       const pct = att && att.totalClasses ? Math.round(att.attendedClasses / att.totalClasses * 100) : 0;
@@ -167,6 +298,7 @@ app.get('/api/:collection/one', auth, (req, res, next) => {
     let item = findRecord(collection, key);
     if (!item && collection === 'syllabus') item = listRecords(collection).find(x => x.subjectId == req.query.subjectId) || null;
     if (item && req.user.role === 'student' && item.studentId !== undefined && item.studentId !== req.user.id) throw httpError(403, 'You cannot view another student’s records.');
+    if (item && req.user.role === 'teacher') assertTeacherOwnsRecord(req, collection, item, key);
     res.json(item);
   } catch (error) { next(error); }
 });
@@ -180,20 +312,53 @@ app.post('/api/:collection', auth, (req, res, next) => {
       const assignment = findRecord('assignments', record.assignmentId);
       if (!assignment) throw httpError(404, 'Assignment not found.');
       record.maxMarks = Number(assignment.maxMarks) || 20;
-      saveOne(collection, record);
+      saveOne(collection, record, undefined, recordTeacherId('assignments', assignment.id));
       assignment.submissionsCount = (assignment.submissionsCount || 0) + 1;
       saveOne('assignments', assignment);
       return res.status(201).json(record);
     }
+    if (collection === 'attendanceSessions') {
+      if (req.user.role !== 'teacher') throw httpError(403, 'Only teachers can record class attendance.');
+      const subjectId = requireInt(req.body.subjectId, 'subjectId');
+      const studentId = requireInt(req.body.studentId, 'studentId');
+      const student = findUserById(studentId);
+      const subject = findRecord('subjects', subjectId);
+      if (!student || student.role !== 'student') throw httpError(404, 'Student not found.');
+      if (!subject) throw httpError(404, 'Subject not found.');
+      assertTeacherOwnsSubject(req, subjectId);
+      if (!teacherCanSeeStudent(req.user.id, student) || Number(student.semester) !== Number(subject.semester)) throw httpError(403, 'This student is not enrolled in the selected subject.');
+      const date = String(req.body.date || '');
+      const classDate = new Date(`${date}T00:00:00Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(classDate.getTime()) || classDate.toISOString().slice(0, 10) !== date) throw httpError(400, 'Enter a valid class date.');
+      if (date > new Date().toISOString().slice(0, 10)) throw httpError(400, 'Attendance cannot be recorded for a future date.');
+      const status = String(req.body.status || '').toLowerCase();
+      if (!['present','absent'].includes(status)) throw httpError(400, 'Attendance status must be present or absent.');
+      const weekday = new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+      if (!listRecords('timetable', req.user.id).some(slot => Number(slot.subjectId) === subjectId && slot.day === weekday)) throw httpError(400, `There is no scheduled ${subject.name} class on ${weekday}.`);
+      const key = `${subjectId}-${studentId}-${date}`;
+      const existing = findRecord(collection, key);
+      const record = { id: key, subjectId, studentId, date, status };
+      saveOne(collection, record, key, req.user.id);
+      const sessions = listRecords(collection, req.user.id).filter(item => Number(item.subjectId) === subjectId && Number(item.studentId) === studentId);
+      const totalClasses = sessions.length;
+      const attendedClasses = sessions.filter(item => item.status === 'present').length;
+      saveOne('attendance', { subjectId, studentId, totalClasses, attendedClasses }, `${subjectId}:${studentId}`, req.user.id);
+      return res.status(existing ? 200 : 201).json(record);
+    }
     if (req.user.role !== 'teacher') throw httpError(403, 'Only teachers can create this resource.');
     const record = { ...req.body, id: nextRecordId(collection) };
+    delete record.teacherId;
+    delete record.ownerId;
+    if (record.subjectId != null && collection !== 'subjects') assertTeacherOwnsSubject(req, record.subjectId);
     if (collection === 'subjects') {
+      record.faculty = req.user.name;
       if (!record.name || !record.code || !(Number(record.credits) > 0) || !Number.isInteger(Number(record.semester)) || Number(record.semester) < 1 || Number(record.semester) > 4) throw httpError(400, 'Subject name, code, positive credits, and semester (1–4) are required.');
       if (listRecords('subjects').some(subject => String(subject.code).toLowerCase() === String(record.code).toLowerCase())) throw httpError(409, 'A subject with this code already exists.');
       const students = listUsers('student');
-      const createAttendance = db.transaction(() => students.forEach(student => saveOne('attendance', { subjectId: record.id, studentId: student.id, totalClasses: record.type === 'lab' ? 24 : 40, attendedClasses: 0 })));
-      saveOne(collection, record); createAttendance();
+      const createAttendance = db.transaction(() => students.forEach(student => saveOne('attendance', { subjectId: record.id, studentId: student.id, totalClasses: record.type === 'lab' ? 24 : 40, attendedClasses: 0 }, `${record.id}:${student.id}`, req.user.id)));
+      saveOne(collection, record, undefined, req.user.id); createAttendance();
     } else {
+      if (collection === 'timetable') Object.assign(record, validateTimetableRecord(req, record));
       if (collection === 'assignments') {
         if (!record.title || !record.subjectId || !findRecord('subjects', record.subjectId)) throw httpError(400, 'Assignment title and a valid subject are required.');
         if (!(Number(record.maxMarks) > 0) || !record.deadline) throw httpError(400, 'Assignment max marks and deadline are required.');
@@ -201,7 +366,7 @@ app.post('/api/:collection', auth, (req, res, next) => {
         record.createdAt = new Date().toISOString().slice(0,10);
         record.status = 'pending';
       }
-      saveOne(collection, record);
+      saveOne(collection, record, undefined, req.user.id);
     }
     res.status(201).json(record);
   } catch (error) { next(error); }
@@ -216,6 +381,7 @@ app.put('/api/:collection/upsert', auth, requireRole('teacher'), (req, res, next
     const student = findUserById(stid);
     if (!student || student.role !== 'student') throw httpError(404, 'Student not found.');
     if (!findRecord('subjects', sid)) throw httpError(404, 'Subject not found.');
+    assertTeacherOwnsSubject(req, sid);
     let record = findRecord(collection, `${sid}:${stid}`) || { subjectId: sid, studentId: stid };
     if (collection === 'attendance') {
       const totalClasses = requireInt(req.body.totalClasses, 'totalClasses');
@@ -235,7 +401,7 @@ app.put('/api/:collection/upsert', auth, requireRole('teacher'), (req, res, next
       if (!Array.isArray(components) || components.some(x => !Number.isFinite(Number(x.marks)) || !Number.isFinite(Number(x.maxMarks)) || Number(x.maxMarks) < 0 || Number(x.marks) < 0 || Number(x.marks) > Number(x.maxMarks))) throw httpError(400, 'Lab marks must be within each component maximum.');
       record = { ...record, components };
     }
-    saveOne(collection, record, `${sid}:${stid}`);
+    saveOne(collection, record, `${sid}:${stid}`, req.user.id);
     res.json(record);
   } catch (error) { next(error); }
 });
@@ -245,11 +411,19 @@ app.put('/api/:collection/:id', auth, requireRole('teacher'), (req, res, next) =
     if (!recordCollections[collection]) throw httpError(404, 'Unknown resource.');
     const record = findRecord(collection, req.params.id);
     if (!record) throw httpError(404, 'Record not found.');
-    const updated = { ...record, ...req.body, id: record.id };
+    assertTeacherOwnsRecord(req, collection, record, req.params.id);
+    const updated = collection === 'submissions'
+      ? { ...record, marks: req.body.marks, feedback: req.body.feedback, id: record.id }
+      : { ...record, ...req.body, id: record.id };
+    delete updated.teacherId;
+    delete updated.ownerId;
+    if (updated.subjectId != null && collection !== 'subjects') assertTeacherOwnsSubject(req, updated.subjectId);
     if (collection === 'subjects') {
+      updated.faculty = req.user.name;
       if (!updated.name || !updated.code || !(Number(updated.credits) > 0) || !Number.isInteger(Number(updated.semester)) || Number(updated.semester) < 1 || Number(updated.semester) > 4) throw httpError(400, 'Subject name, code, credits, and semester are invalid.');
       if (listRecords('subjects').some(subject => subject.id !== record.id && String(subject.code).toLowerCase() === String(updated.code).toLowerCase())) throw httpError(409, 'A subject with this code already exists.');
     }
+    if (collection === 'timetable') Object.assign(updated, validateTimetableRecord(req, updated, record.id));
     if (collection === 'assignments' && (!String(updated.title || '').trim() || !(Number(updated.maxMarks) > 0) || !findRecord('subjects', updated.subjectId))) throw httpError(400, 'Assignment title, valid subject, and positive max marks are required.');
     if (collection === 'quizzes' && (!Number.isFinite(Number(updated.marksObtained)) || Number(updated.marksObtained) < 0 || Number(updated.marksObtained) > Number(updated.maxMarks))) throw httpError(400, `Quiz marks must be between 0 and ${updated.maxMarks}.`);
     if (collection === 'submissions') {
@@ -257,7 +431,7 @@ app.put('/api/:collection/:id', auth, requireRole('teacher'), (req, res, next) =
       if (marks == null || marks < 0 || marks > Number(updated.maxMarks)) throw httpError(400, `Marks must be between 0 and ${updated.maxMarks}.`);
       updated.status = 'checked';
     }
-    saveOne(collection, updated);
+    saveOne(collection, updated, undefined, req.user.id);
     res.json(updated);
   } catch (error) { next(error); }
 });
@@ -266,10 +440,12 @@ app.delete('/api/:collection/:id', auth, requireRole('teacher'), (req, res, next
     const collection = req.params.collection;
     if (!recordCollections[collection]) throw httpError(404, 'Unknown resource.');
     const deleting = findRecord(collection, req.params.id);
-    if (!deleting || !deleteRecord(collection, req.params.id)) throw httpError(404, 'Record not found.');
+    if (!deleting) throw httpError(404, 'Record not found.');
+    assertTeacherOwnsRecord(req, collection, deleting, req.params.id);
+    if (!deleteRecord(collection, req.params.id)) throw httpError(404, 'Record not found.');
     if (collection === 'assignments') removeStoredFiles(deleting);
     if (collection === 'subjects') {
-      for (const related of ['attendance','quizzes','internals','endSems','labMarks','syllabus']) {
+      for (const related of ['timetable','attendance','attendanceSessions','quizzes','internals','endSems','labMarks','syllabus']) {
         for (const item of listRecords(related).filter(x => x.subjectId == req.params.id)) {
           const key = item.id ?? `${item.subjectId ?? ''}:${item.studentId ?? ''}`;
           deleteRecord(related, key);
@@ -294,7 +470,7 @@ app.post('/api/submissions/upload', auth, requireRole('student'), upload.array('
     if (!assignment) { uploaded.forEach(file => fs.unlinkSync(file.path)); throw httpError(404, 'Assignment not found.'); }
     const files = uploaded.map(storedFile);
     const record = { id: nextRecordId('submissions'), assignmentId, studentId: req.user.id, files, fileNames: files.map(file => file.name), fileName: files[0].name, filePath: files[0].path, submittedAt: new Date().toISOString().slice(0,10), status: 'submitted', marks: null, feedback: null, maxMarks: Number(assignment.maxMarks) || 20 };
-    saveOne('submissions', record);
+    saveOne('submissions', record, undefined, recordTeacherId('assignments', assignment.id));
     assignment.submissionsCount = (assignment.submissionsCount || 0) + 1;
     saveOne('assignments', assignment);
     res.status(201).json(record);
@@ -306,13 +482,14 @@ app.post('/api/assignments/upload', auth, requireRole('teacher'), upload.array('
     if (!uploaded.length) throw httpError(400, 'Choose at least one assignment file to upload.');
     const subjectId = requireInt(req.body.subjectId, 'subjectId');
     const subject = findRecord('subjects', subjectId);
+    if (subject) assertTeacherOwnsSubject(req, subjectId);
     const title = String(req.body.title || '').trim();
     const maxMarks = number(req.body.maxMarks);
     const deadline = String(req.body.deadline || '');
     if (!subject || !title || maxMarks == null || maxMarks <= 0 || !deadline) { uploaded.forEach(file => fs.unlinkSync(file.path)); throw httpError(400, 'A valid subject, title, positive max marks, and deadline are required.'); }
     const files = uploaded.map(storedFile);
     const record = { id: nextRecordId('assignments'), subjectId, title, description: String(req.body.description || ''), maxMarks, deadline, status: 'pending', submissionsCount: 0, createdAt: new Date().toISOString().slice(0,10), files, fileNames: files.map(file => file.name), fileName: files[0].name, filePath: files[0].path };
-    saveOne('assignments', record);
+    saveOne('assignments', record, undefined, req.user.id);
     res.status(201).json(record);
   } catch (error) { (req.files || []).forEach(file => { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); }); next(error); }
 });
@@ -320,6 +497,7 @@ app.get('/api/assignments/:id/file', auth, (req, res, next) => {
   try {
     const assignment = findRecord('assignments', req.params.id);
     if (!assignment) throw httpError(404, 'Assignment not found.');
+    assertTeacherOwnsRecord(req, 'assignments', assignment, req.params.id);
     const file = filesFor(assignment)[0];
     if (!file) throw httpError(404, 'No file is attached to this assignment.');
     res.download(uploadPath(file.path), file.name);
@@ -329,6 +507,7 @@ app.get('/api/assignments/:id/files/:index', auth, (req, res, next) => {
   try {
     const assignment = findRecord('assignments', req.params.id);
     if (!assignment) throw httpError(404, 'Assignment not found.');
+    assertTeacherOwnsRecord(req, 'assignments', assignment, req.params.id);
     const file = filesFor(assignment)[requireInt(req.params.index, 'file index')];
     if (!file) throw httpError(404, 'Assignment file not found.');
     res.download(uploadPath(file.path), file.name);
@@ -339,6 +518,7 @@ app.get('/api/submissions/:id/file', auth, (req, res, next) => {
     const record = findRecord('submissions', req.params.id);
     if (!record) throw httpError(404, 'Submission not found.');
     if (req.user.role === 'student' && record.studentId !== req.user.id) throw httpError(403, 'You cannot download another student’s files.');
+    assertTeacherOwnsRecord(req, 'submissions', record, req.params.id);
     const file = filesFor(record)[0];
     if (!file) throw httpError(404, 'This submission has no uploaded file.');
     res.download(uploadPath(file.path), file.name);
@@ -349,6 +529,7 @@ app.get('/api/submissions/:id/files/:index', auth, (req, res, next) => {
     const record = findRecord('submissions', req.params.id);
     if (!record) throw httpError(404, 'Submission not found.');
     if (req.user.role === 'student' && record.studentId !== req.user.id) throw httpError(403, 'You cannot download another student’s files.');
+    assertTeacherOwnsRecord(req, 'submissions', record, req.params.id);
     const file = filesFor(record)[requireInt(req.params.index, 'file index')];
     if (!file) throw httpError(404, 'Submission file not found.');
     res.download(uploadPath(file.path), file.name);
@@ -360,6 +541,7 @@ app.get('/api/students/:id', auth, (req, res, next) => {
     const student = findUserById(req.params.id);
     if (!student || student.role !== 'student') throw httpError(404, 'Student not found.');
     if (req.user.role === 'student' && student.id !== req.user.id) throw httpError(403, 'You cannot view another student’s profile.');
+    if (req.user.role === 'teacher' && !teacherCanSeeStudent(req.user.id, student)) throw httpError(403, 'This student is not in your assigned subjects.');
     res.json(student);
   } catch (error) { next(error); }
 });
@@ -370,6 +552,7 @@ app.get('/api/:collection/:id', auth, (req, res, next) => {
     const record = findRecord(collection, id);
     if (!record) throw httpError(404, 'Record not found.');
     if (req.user.role === 'student' && record.studentId !== undefined && record.studentId !== req.user.id) throw httpError(403, 'You cannot view another student’s records.');
+    if (req.user.role === 'teacher') assertTeacherOwnsRecord(req, collection, record, id);
     res.json(record);
   } catch (error) { next(error); }
 });

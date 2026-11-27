@@ -69,6 +69,8 @@
     if(view==='subjects') loadSubjectsView();
     if(view==='subject-details'){ const c=$('#subjectDetailsView'); const L=c?(c.dataset.loadedId||''):''; if(c && !L.startsWith('pending') && L!==String(State.currentSubjectId)) openSubject(State.currentSubjectId); }
     if(view==='attendance') loadAttendanceView();
+    if(view==='timetable') loadTimetableView();
+    if(view==='fees') loadFeesView();
     if(view==='quiz') loadQuizView();
     if(view==='internal') loadInternalView();
     if(view==='assignments') loadAssignmentsView();
@@ -119,11 +121,22 @@
   }
 
   /* ---------- Loaders ---------- */
+  function renderTimetableGrid(sessions, editable=false){
+    const days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    return `<div class="row g-3">${days.map(day=>{
+      const rows=sessions.filter(session=>session.day===day).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+      return `<div class="col-md-6 col-xl-4"><div class="card-saas h-100"><div class="card-header-saas"><div class="fw-bold"><i class="fa-regular fa-calendar me-2 text-danger"></i>${day}</div><span class="small text-muted">${rows.length} class${rows.length===1?'':'es'}</span></div>
+        ${rows.length?`<div class="table-responsive"><table class="table table-saas mb-0"><tbody>${rows.map(item=>`<tr><td class="small fw-semibold" style="white-space:nowrap">${esc(item.startTime)}–${esc(item.endTime)}</td><td><div class="small fw-bold">${esc(item.subjectName)}</div><div class="small text-muted">${esc(item.room)} · ${esc(item.teacherName)}${item.teacherEmail?` · <a href="mailto:${escAttr(item.teacherEmail)}">${esc(item.teacherEmail)}</a>`:''}</div></td>${editable?`<td class="text-end" style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Edit class" onclick="editTimetable(${Number(item.id)})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-sm text-danger" title="Delete class" onclick="deleteTimetable(${Number(item.id)})"><i class="fa-solid fa-trash"></i></button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="small text-muted p-3">No scheduled classes</div>`}
+      </div></div>`;
+    }).join('')}</div>`;
+  }
+
   async function loadDashboard(){
     const dash=$('#dashboardContent'); if(!dash) return;
     dash.innerHTML=`<div class="row g-3">${skeletonCards(4)}</div><div class="row g-3 mt-1">${skeletonCards(3)}</div>`;
     try{
-      const [subjects, attendance, quizzes, internals, endsems, labMarks, assignments, exams, notices, notifications, submissions] = await Promise.all([
+      const timetablePromise=API.getTimetable().then(items=>({items,error:null})).catch(error=>({items:[],error}));
+      const [subjects, attendance, quizzes, internals, endsems, labMarks, assignments, exams, notices, notifications, submissions, timetableResult] = await Promise.all([
         API.getSubjects({semester: State.semester}),
         API.getAttendance({studentId: State.studentId}),
         API.getQuizzes({studentId: State.studentId}),
@@ -134,8 +147,11 @@
         API.getExams({}),
         API.getNotices({}),
         API.getNotifications(),
-        API.getSubmissions({studentId: State.studentId})
+        API.getSubmissions({studentId: State.studentId}),
+        timetablePromise
       ]);
+      const timetable=timetableResult.items;
+      const timetableError=timetableResult.error;
       State.subjects=subjects; State.attendance=attendance; State.quizzes=quizzes; State.internals=internals; State.endsems=endsems; State.labMarks=labMarks; State.assignments=assignments; State.exams=exams; State.notices=notices; State.notifications=notifications; State.submissions=submissions;
       attendance.forEach(a=> a.percentage = calculateAttendance(a.attendedClasses, a.totalClasses));
       const semSubjects = subjects.filter(s=>s.semester===State.semester);
@@ -219,6 +235,11 @@
           </div></div>
         </div>
 
+        <div class="card-saas mt-3">
+          <div class="card-header-saas"><div><div class="fw-bold"><i class="fa-solid fa-calendar-week me-2 text-danger"></i>Weekly timetable</div><div class="small text-muted">Schedule published by your teachers</div></div><button class="btn btn-ghost btn-sm" onclick="setView('timetable')">Open full timetable <i class="fa-solid fa-arrow-right ms-1"></i></button></div>
+          <div class="card-body"><div class="alert ${timetableError?'alert-danger':'alert-warning'} small py-2">${timetableError?`Timetable service is not available from the running server (${esc(timetableError.message)}). Restart or redeploy the server to load teacher-published classes.`:'Sample timetable data may not match the official department schedule.'}</div>${renderTimetableGrid(timetable)}</div>
+        </div>
+
         <div class="row g-3 mt-1">
           <div class="col-lg-8">
             <div class="card-saas h-100">
@@ -232,6 +253,8 @@
                     const att = attendance.find(a=>a.subjectId===s.id);
                     const perc = att? att.percentage:0;
                     const status = getAttendanceStatus(perc);
+                    const attProjection=getAttendanceProjection(att?.attendedClasses||0,att?.totalClasses||0,75);
+                    const attendanceTip=att?.totalClasses?attendanceAdvice(attProjection):'No classes have been recorded yet.';
                     let marksText='-', subText='';
                     if(s.type==='lab'){
                       const lab = labMarks.find(l=>l.subjectId===s.id);
@@ -256,6 +279,7 @@
                             <div class="d-flex justify-content-between small fw-bold"><span>Attendance</span><span class="${status.met?'text-success':'text-danger'}">${perc.toFixed(1)}% ${status.met?'✓':''}</span></div>
                             <div class="progress progress-saas mt-1" style="height:8px;"><div class="progress-bar" style="width:${perc}%;background:${status.met?'#10b981':'#ef4444'}"></div></div>
                             <div class="small text-muted mt-1">${status.label} • Required 75%</div>
+                            <div class="small mt-1 ${attProjection.met?'text-success':'text-danger'}">${esc(attendanceTip)}</div>
                           </div>
                           <div class="mt-3 d-flex justify-content-between align-items-center p-2 rounded" style="background:var(--bg-soft);border:1px solid var(--border);">
                             <div><div class="small text-muted" style="font-weight:600;letter-spacing:0.04em;">CURRENT MARKS</div><div class="fw-bold" style="font-size:1.08rem;">${marksText} <span class="small fw-normal text-muted">${subText}</span></div></div>
@@ -676,40 +700,164 @@
     }
   }
 
+  function attendanceAdvice(projection){
+    if(projection.met) return `You can miss up to ${projection.classesCanSkip} more class${projection.classesCanSkip===1?'':'es'} and stay at or above 75%.`;
+    return `Attend the next ${projection.classesToAttend} scheduled class${projection.classesToAttend===1?'':'es'} to reach 75% (assuming no further absences).`;
+  }
+
   async function loadAttendanceView(){
     const el=$('#attendanceView'); if(!el) return;
     el.innerHTML=`<div class="row g-3">${skeletonCards(3)}</div>`;
     try{
-      const [subjects, attendance]=await Promise.all([API.getSubjects({semester: State.semester}), API.getAttendance({studentId: State.studentId})]);
-      const semAtt=attendance.filter(a=> subjects.some(s=>s.id===a.subjectId && s.semester===State.semester));
+      const [subjects, attendance, sessions]=await Promise.all([
+        API.getSubjects({semester: State.semester}),
+        API.getAttendance({studentId: State.studentId}),
+        API.getAttendanceSessions({studentId: State.studentId})
+      ]);
+      const semSubjects=subjects.filter(subject=>Number(subject.semester)===Number(State.semester));
+      const semAtt=attendance.filter(record=>semSubjects.some(subject=>subject.id===record.subjectId));
+      const semSessions=sessions.filter(record=>semSubjects.some(subject=>subject.id===record.subjectId)).sort((a,b)=>b.date.localeCompare(a.date));
+      const overallAttended=semAtt.reduce((sum,item)=>sum+Number(item.attendedClasses||0),0);
+      const overallTotal=semAtt.reduce((sum,item)=>sum+Number(item.totalClasses||0),0);
+      const overallProjection=getAttendanceProjection(overallAttended,overallTotal,75);
       const overall=calculateOverallAttendance(semAtt);
-      const st=getAttendanceStatus(overall);
+      const status=getAttendanceStatus(overall);
+      const subjectById=new Map(semSubjects.map(subject=>[Number(subject.id),subject]));
+      const advice=attendanceAdvice(overallProjection);
       el.innerHTML=`
         <div class="card-saas mb-3"><div class="card-body d-flex flex-wrap gap-3 align-items-center">
           <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(${overall>=75?'#10b981':'#ef4444'} 0% ${overall}%, var(--border) ${overall}% 100%);display:grid;place-items:center;"><div style="width:84px;height:84px;border-radius:50%;background:var(--card);display:grid;place-items:center;box-shadow:var(--shadow);"><div class="text-center"><div class="fw-bold" style="font-size:1.25rem;">${overall.toFixed(1)}%</div><div class="small text-muted">Overall</div></div></div></div>
-          <div>
-            <div class="fw-bold">Overall Attendance • Semester ${State.semester}</div>
-            <div class="small text-muted">Required: 75% • <span class="${st.met?'text-success':'text-danger'} fw-bold">${st.label}</span> • Attendance does NOT add marks (§9)</div>
-            <div class="progress progress-saas mt-2" style="max-width:360px;"><div class="progress-bar" style="width:${overall}%;background:${st.met?'#10b981':'#ef4444'}"></div></div>
-          </div>
+          <div class="flex-fill"><div class="fw-bold">Overall Attendance • Semester ${State.semester}</div><div class="small text-muted">${overallAttended} of ${overallTotal} classes attended • Required: 75% • <span class="${status.met?'text-success':'text-danger'} fw-bold">${status.label}</span></div><div class="fw-semibold small mt-2 ${overallProjection.met?'text-success':'text-danger'}">${esc(advice)}</div><div class="progress progress-saas mt-2" style="max-width:440px;"><div class="progress-bar" style="width:${overall}%;background:${status.met?'#10b981':'#ef4444'}"></div></div></div>
           <div class="ms-auto chart-wrap sm" style="width:280px;height:160px;"><canvas id="attChart"></canvas></div>
         </div></div>
         <div class="row g-3">
-          ${semAtt.map(a=>{
-            const s=subjects.find(x=>x.id===a.subjectId);
-            const perc=calculateAttendance(a.attendedClasses,a.totalClasses);
-            const st2=getAttendanceStatus(perc);
-            return `<div class="col-md-6 col-xl-4"><div class="card-saas"><div class="card-top" style="height:4px;background:${s?.color||'#c8102e'}"></div><div class="card-body">
-              <div class="fw-bold small">${esc(s?.name||'Subject')}</div><div class="small text-muted">${esc(s?.code||'')} • ${a.attendedClasses}/${a.totalClasses} classes</div>
-              <div class="d-flex justify-content-between small fw-bold mt-2"><span>Attendance</span><span class="${st2.met?'text-success':'text-danger'}">${perc.toFixed(1)}%</span></div>
-              <div class="progress progress-saas mt-1"><div class="progress-bar" style="width:${perc}%;background:${st2.met?'#10b981':'#ef4444'}"></div></div>
-              <div class="small mt-1 ${st2.met?'text-success':'text-danger'}"><i class="fa-solid ${st2.met?'fa-circle-check':'fa-triangle-exclamation'} me-1"></i>${st2.label} • Required 75%</div>
+          ${semAtt.map(record=>{
+            const subject=subjectById.get(Number(record.subjectId));
+            const percentage=calculateAttendance(record.attendedClasses,record.totalClasses);
+            const state=getAttendanceStatus(percentage);
+            const projection=getAttendanceProjection(record.attendedClasses,record.totalClasses,75);
+            return `<div class="col-md-6 col-xl-4"><div class="card-saas"><div class="card-top" style="height:4px;background:${subject?.color||'#c8102e'}"></div><div class="card-body">
+              <div class="fw-bold small">${esc(subject?.name||'Subject')}</div><div class="small text-muted">${esc(subject?.code||'')} • ${record.attendedClasses}/${record.totalClasses} classes attended</div>
+              <div class="d-flex justify-content-between small fw-bold mt-2"><span>Attendance</span><span class="${state.met?'text-success':'text-danger'}">${percentage.toFixed(1)}%</span></div><div class="progress progress-saas mt-1"><div class="progress-bar" style="width:${percentage}%;background:${state.met?'#10b981':'#ef4444'}"></div></div>
+              <div class="small mt-2 ${state.met?'text-success':'text-danger'}"><i class="fa-solid ${state.met?'fa-circle-check':'fa-triangle-exclamation'} me-1"></i>${esc(attendanceAdvice(projection))}</div>
             </div></div></div>`;
           }).join('')}
+        </div>
+        <div class="card-saas mt-3"><div class="card-header-saas"><div><div class="fw-bold">Daily attendance history</div><div class="small text-muted">Present and absent class records in date order. Sample accounts show demonstration data.</div></div><span class="badge rounded-pill bg-light text-dark">${semSessions.length} class records</span></div>
+          ${semSessions.length?`<div class="table-responsive" style="max-height:520px;overflow:auto"><table class="table table-saas mb-0"><thead><tr><th>Date</th><th>Day</th><th>Subject</th><th>Record</th></tr></thead><tbody>${semSessions.map(session=>{
+            const subject=subjectById.get(Number(session.subjectId));
+            const day=new Date(`${session.date}T12:00:00Z`).toLocaleDateString('en-IN',{weekday:'long',timeZone:'UTC'});
+            const present=session.status==='present';
+            return `<tr><td class="small">${fmtDate(session.date)}</td><td class="small">${day}</td><td class="small fw-semibold">${esc(subject?.name||'Subject')}</td><td><span class="badge rounded-pill ${present?'bg-success':'bg-danger'}">${present?'Present':'Absent'}</span></td></tr>`;
+          }).join('')}</tbody></table></div>`:`<div class="empty-state py-4"><div class="small text-muted">No dated attendance has been recorded for this semester yet.</div></div>`}
         </div>`;
-      setTimeout(()=> Charts.attendanceChart('attChart', semAtt, subjects), 120);
-    }catch(e){ el.innerHTML=`<div class="card-saas p-4 text-center"><div class="fw-bold">Unable to load attendance</div><div class="small text-muted">${esc(e.message)}</div><button class="btn btn-primary-saas mt-3" onclick="loadAttendanceView()">Retry</button></div>`; }
+      setTimeout(()=>Charts.attendanceChart('attChart',semAtt,subjects),120);
+    }catch(error){el.innerHTML=`<div class="card-saas p-4 text-center"><div class="fw-bold">Unable to load attendance</div><div class="small text-muted">${esc(error.message)}</div><button class="btn btn-primary-saas mt-3" onclick="loadAttendanceView()">Retry</button></div>`;}
   }
+
+  async function loadTimetableView(){
+    const el=$('#timetableView'); if(!el) return;
+    el.innerHTML=`<div class="skeleton skeleton-card"></div>`;
+    try{
+      const [sessions,subjects]=await Promise.all([API.getTimetable(),State.role==='teacher'?API.getSubjects({}):Promise.resolve([])]);
+      window.__timetableRows=sessions;
+      window.__timetableSubjects=subjects;
+      const teacherTools=State.role==='teacher'?`<div class="d-flex justify-content-end mb-3"><button class="btn btn-primary-saas" onclick="openTimetableModal()"><i class="fa-solid fa-plus me-2"></i>Add class to timetable</button></div>`:'';
+      const notice=State.role==='teacher'
+        ?'Manage timetable entries for your subjects below. Saved changes appear in students’ dashboards. Seeded entries remain sample academic data.'
+        :'This weekly schedule is provided by teachers. Seeded entries are sample data; confirm official changes with your department.';
+      el.innerHTML=`<div class="alert ${State.role==='teacher'?'alert-info':'alert-warning'} small"><i class="fa-solid fa-circle-info me-2"></i>${notice}</div>${teacherTools}${renderTimetableGrid(sessions,State.role==='teacher')}`;
+    }catch(error){const hint=error.status===404?'The currently running server does not have timetable support yet. Restart or redeploy the server, then refresh this page.':error.message;el.innerHTML=`<div class="card-saas p-4 text-center"><div class="fw-bold">Unable to load timetable</div><div class="small text-muted">${esc(hint)}</div></div>`;}
+  }
+
+  window.openTimetableModal=(timetableId=null)=>{
+    const form=$('#timetableForm');
+    const modalEl=$('#timetableModal');
+    if(!form||!modalEl) return;
+    form.reset();
+    const subjectSelect=form.elements.subjectId;
+    const subjects=window.__timetableSubjects||[];
+    subjectSelect.innerHTML=subjects.map(subject=>`<option value="${Number(subject.id)}">${esc(subject.code)} · ${esc(subject.name)}</option>`).join('');
+    form.elements.id.value='';
+    $('#timetableModalTitle').textContent='Add timetable class';
+    if(timetableId!=null){
+      const row=(window.__timetableRows||[]).find(item=>Number(item.id)===Number(timetableId));
+      if(!row) return toast('Timetable entry not found','error');
+      form.elements.id.value=row.id;
+      form.elements.subjectId.value=row.subjectId;
+      form.elements.day.value=row.day;
+      form.elements.startTime.value=row.startTime;
+      form.elements.endTime.value=row.endTime;
+      form.elements.room.value=row.room;
+      $('#timetableModalTitle').textContent='Edit timetable class';
+    }
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  };
+  window.editTimetable=id=>window.openTimetableModal(id);
+  window.deleteTimetable=async id=>{
+    const row=(window.__timetableRows||[]).find(item=>Number(item.id)===Number(id));
+    if(!row||!confirm(`Remove ${row.subjectName} from ${row.day}'s timetable?`)) return;
+    try{await API.deleteTimetable(id);toast('Timetable class removed.','success');await loadTimetableView();}
+    catch(error){toast(error.message||'Could not remove timetable class','error');}
+  };
+  async function handleTimetableSave(event){
+    event.preventDefault();
+    const form=event.currentTarget;
+    const formData=new FormData(form);
+    const payload={subjectId:Number(formData.get('subjectId')),day:String(formData.get('day')||''),startTime:String(formData.get('startTime')||''),endTime:String(formData.get('endTime')||''),room:String(formData.get('room')||'').trim()};
+    const id=String(formData.get('id')||'');
+    try{
+      if(id) await API.updateTimetable(id,payload);
+      else await API.createTimetable(payload);
+      bootstrap.Modal.getInstance($('#timetableModal'))?.hide();
+      toast(id?'Timetable class updated. Students will see the change.':'Timetable class added. Students will see it on their dashboard.','success');
+      await loadTimetableView();
+    }catch(error){toast(error.message||'Could not save timetable class','error');}
+  }
+
+  function moneyInr(amount){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(amount)||0);}
+  async function loadFeesView(){
+    const el=$('#feesView'); if(!el) return;
+    el.innerHTML=`<div class="skeleton skeleton-card"></div>`;
+    try{
+      const [invoices,payments]=await Promise.all([API.getFees({}),API.getFeePayments({})]);
+      window.__feeInvoices=invoices; window.__feePayments=payments;
+      const outstanding=invoices.filter(invoice=>invoice.status!=='paid').reduce((sum,invoice)=>sum+Number(invoice.amountInr||0),0);
+      el.innerHTML=`<div class="alert alert-warning small"><i class="fa-solid fa-triangle-exclamation me-2"></i><strong>Demo billing only:</strong> this page does not connect to a bank or payment gateway. “Pay sample fee” only updates the demo ledger; no real money is charged. Amounts are sample values and are not official fee notices.</div>
+        <div class="card-saas mb-3"><div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2"><div><div class="small text-muted">Outstanding sample balance</div><div class="h3 fw-bold mb-0">${moneyInr(outstanding)}</div></div><span class="badge rounded-pill ${outstanding?'bg-warning text-dark':'bg-success'}">${outstanding?'Payment due':'Clear'}</span></div></div>
+        <div class="card-saas mb-3"><div class="card-header-saas"><div class="fw-bold">Fee invoices</div><span class="small text-muted">${invoices.length} invoice${invoices.length===1?'':'s'}</span></div>
+          ${invoices.length?`<div class="table-responsive"><table class="table table-saas mb-0"><thead><tr><th>Academic year / semester</th><th>Description</th><th>Due date</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${invoices.map(invoice=>`<tr><td class="small fw-semibold">${esc(invoice.academicYear)} · Sem ${invoice.semester}</td><td class="small">${esc(invoice.description)}</td><td class="small">${fmtDate(invoice.dueDate)}</td><td class="fw-bold">${moneyInr(invoice.amountInr)}</td><td><span class="badge rounded-pill ${invoice.status==='paid'?'bg-success':'bg-warning text-dark'}">${invoice.status==='paid'?'Paid (demo)':'Due'}</span></td><td>${invoice.status==='paid'?'<span class="small text-muted">Paid</span>':`<button class="btn btn-primary-saas btn-sm" onclick="payDemoFee(${Number(invoice.id)})">Pay sample fee</button>`}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state py-4"><div class="small text-muted">No fee invoices have been issued for this account.</div></div>`}
+        </div>
+        <div class="card-saas"><div class="card-header-saas"><div class="fw-bold">Payment receipts</div><span class="small text-muted">${payments.length} receipt${payments.length===1?'':'s'}</span></div>
+          ${payments.length?`<div class="table-responsive"><table class="table table-saas mb-0"><thead><tr><th>Receipt no.</th><th>Paid on</th><th>Amount</th><th>Type</th><th></th></tr></thead><tbody>${payments.slice().sort((a,b)=>b.paidAt.localeCompare(a.paidAt)).map(payment=>`<tr><td class="small fw-bold">${esc(payment.receiptNo)}</td><td class="small">${fmtDate(payment.paidAt)}</td><td class="fw-bold">${moneyInr(payment.amountInr)}</td><td class="small">${esc(payment.paymentMethod)}</td><td><button class="btn btn-ghost btn-sm" onclick="viewFeeReceipt(${Number(payment.id)})"><i class="fa-solid fa-eye me-1"></i>View</button><button class="btn btn-ghost btn-sm" onclick="downloadFeeReceipt(${Number(payment.id)})"><i class="fa-solid fa-download me-1"></i>Download</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state py-4"><div class="small text-muted">No payments or receipts yet.</div></div>`}
+        </div>`;
+    }catch(error){el.innerHTML=`<div class="card-saas p-4 text-center"><div class="fw-bold">Unable to load fee information</div><div class="small text-muted">${esc(error.message)}</div></div>`;}
+  }
+  window.payDemoFee=async invoiceId=>{
+    if(!confirm('This is a demo action only. No real payment will be charged. Mark this sample invoice as paid?')) return;
+    try{await API.payDemoFee(invoiceId);toast('Sample fee marked paid. Your demo receipt is ready.','success');await loadFeesView();}
+    catch(error){toast(error.message||'Could not update sample fee','error');}
+  };
+  function feeReceiptHtml(paymentId){
+    const payment=(window.__feePayments||[]).find(item=>Number(item.id)===Number(paymentId));
+    const invoice=(window.__feeInvoices||[]).find(item=>Number(item.id)===Number(payment?.invoiceId));
+    if(!payment) return null;
+    const user=State.currentUser||{};
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Demo fee receipt ${esc(payment.receiptNo)}</title><style>body{font:16px Arial,sans-serif;max-width:720px;margin:40px auto;color:#172033}header{border-bottom:3px solid #9f1239;padding-bottom:16px}.warning{margin:24px 0;padding:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}.row{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding:12px 0}.small{color:#64748b;font-size:13px}@media print{button{display:none}}</style></head><body><header><h1>MCA Academic Dashboard</h1><div>Fee payment receipt · ${esc(payment.receiptNo)}</div></header><div class="warning"><strong>DEMO RECEIPT — NOT PROOF OF A REAL PAYMENT.</strong><br>No money was charged; this is a sample application record only.</div><div class="row"><span>Student</span><strong>${esc(user.name||'Student')}</strong></div><div class="row"><span>Roll number</span><strong>${esc(user.roll||'—')}</strong></div><div class="row"><span>Invoice</span><strong>${esc(invoice?.description||'Semester fee')}</strong></div><div class="row"><span>Academic year / semester</span><strong>${esc(invoice?.academicYear||'')} · ${esc(invoice?.semester||'')}</strong></div><div class="row"><span>Amount</span><strong>${moneyInr(payment.amountInr)}</strong></div><div class="row"><span>Recorded at</span><strong>${esc(new Date(payment.paidAt).toLocaleString('en-IN'))}</strong></div><div class="row"><span>Payment status</span><strong>DEMO PAID</strong></div><p class="small">For actual fee payment and official receipt, use the institution’s approved payment portal.</p><button onclick="window.print()">Print receipt</button></body></html>`;
+  }
+  window.viewFeeReceipt=paymentId=>{
+    const html=feeReceiptHtml(paymentId);
+    if(!html){toast('Receipt not found','error');return;}
+    const preview=window.open('about:blank','_blank');
+    if(!preview){toast('Allow pop-ups to view the receipt, or use Download.','warning');return;}
+    preview.opener=null;preview.document.open();preview.document.write(html);preview.document.close();
+  };
+  window.downloadFeeReceipt=paymentId=>{
+    const html=feeReceiptHtml(paymentId);
+    const payment=(window.__feePayments||[]).find(item=>Number(item.id)===Number(paymentId));
+    if(!html||!payment){toast('Receipt not found','error');return;}
+    const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));const link=document.createElement('a');link.href=url;link.download=`${payment.receiptNo}.html`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
 
   async function loadQuizView(){
     const el=$('#quizView'); if(!el) return;
@@ -1183,52 +1331,36 @@
     const el=$('#teacherAttendanceView'); if(!el) return;
     el.innerHTML=`<div class="skeleton skeleton-card"></div>`;
     try{
-      const [subjects, students]=await Promise.all([API.getSubjects({semester: State.semester}), API.getStudents({})]);
-      // ensure selected student exists
-      if(!students.find(s=>s.id===State.teacherSelectedStudentId)) State.teacherSelectedStudentId = students[0]?.id || 101;
-      const selStudent = students.find(s=>s.id===State.teacherSelectedStudentId);
-      const attendance=await API.getAttendance({studentId: State.teacherSelectedStudentId});
-      const selName = selStudent? selStudent.name : 'Student';
-      el.innerHTML=`
-        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-          <div class="fw-bold">Attendance Management - <span style="color:var(--primary);">${esc(selName)}</span></div>
-          <select id="attStudentSwitch" class="form-select form-select-sm" style="max-width:220px; border-radius:999px;">
-            ${students.map(s=>`<option value="${s.id}" ${s.id===State.teacherSelectedStudentId?'selected':''}>${esc(s.name)} - ${esc(s.roll)}</option>`).join('')}
-          </select>
-          <span class="small text-muted">Every student, every subject - update and it persists for that student</span>
-        </div>
-        <div class="card-saas"><div class="card-header-saas"><div><div class="fw-bold">Per-Subject Attendance for ${esc(selName)}</div><div class="small text-muted">Update total and attended classes • Attended cannot exceed total • Percentage is calculated automatically • 75% eligibility • Changes are saved to the database</div></div><span class="badge rounded-pill" style="background:var(--bg-soft);border:1px solid var(--border);">${attendance.length} subjects</span></div>
-          <div class="table-responsive"><table class="table table-saas mb-0"><thead><tr><th>Subject</th><th>Code</th><th>Total</th><th>Attended</th><th>%</th><th>Status</th><th>Save</th></tr></thead><tbody>
-            ${attendance.map(a=>{
-              const s=subjects.find(x=>x.id===a.subjectId) || {name:'Subject '+a.subjectId, code:'', color:'#c8102e'};
-              const perc=calculateAttendance(a.attendedClasses,a.totalClasses);
-              const st=getAttendanceStatus(perc);
-              return `<tr><td class="small fw-bold">${esc(s.name)}</td><td class="small text-muted">${esc(s.code||'')}</td><td><input class="form-control form-control-saas form-control-sm" style="width:80px;" value="${a.totalClasses}" type="number" min="0" id="att-total-${a.subjectId}"></td><td><input class="form-control form-control-saas form-control-sm" style="width:80px;" value="${a.attendedClasses}" type="number" min="0" id="att-att-${a.subjectId}"></td><td class="${st.met?'text-success':'text-danger'} fw-bold" id="att-perc-${a.subjectId}">${perc.toFixed(1)}%</td><td><span class="badge ${st.met?'bg-success':'bg-danger'} rounded-pill" style="font-size:0.68rem;">${esc(st.label)}</span></td><td><button class="btn btn-primary-saas btn-sm" onclick="saveAtt(${a.subjectId})"><i class="fa-solid fa-check"></i> Save</button></td></tr>`;
-            }).join('')}
-          </tbody></table></div>
-          <div class="small text-muted p-3 d-flex flex-wrap gap-2" style="border-top:1px solid var(--border);"><span><i class="fa-solid fa-circle-info me-1"></i>Validation: Attended ≤ Total • Required 75%. Example: Aman has 68% in some subjects (below 75% warning) • Changes are saved to the database and visible to the student after refresh.</span><button class="btn btn-ghost btn-sm ms-auto" onclick="navigator.clipboard&&navigator.clipboard.writeText('Login as '+selName+' to see updated attendance')"><i class="fa-solid fa-eye me-1"></i>How student sees it</button></div>
-        </div>
-      `;
-      document.getElementById('attStudentSwitch').addEventListener('change', (e)=>{
-        State.teacherSelectedStudentId = parseInt(e.target.value);
-        loadTeacherAttendance();
-      });
-      window.saveAtt=async(sid)=>{
-        const total=parseInt(document.getElementById(`att-total-${sid}`).value);
-        const att=parseInt(document.getElementById(`att-att-${sid}`).value);
-        if(isNaN(total)||isNaN(att)){ toast('Enter numbers','error'); return; }
-        if(att>total){ toast('Attended cannot exceed Total','error'); return; }
+      const [subjects,students]=await Promise.all([API.getSubjects({semester:State.semester}),API.getStudents({})]);
+      if(!students.find(student=>student.id===State.teacherSelectedStudentId)) State.teacherSelectedStudentId=students[0]?.id||101;
+      const selected=students.find(student=>student.id===State.teacherSelectedStudentId);
+      const [attendance,sessions]=await Promise.all([API.getAttendance({studentId:State.teacherSelectedStudentId}),API.getAttendanceSessions({studentId:State.teacherSelectedStudentId})]);
+      const subjectById=new Map(subjects.map(subject=>[Number(subject.id),subject]));
+      const history=sessions.slice().sort((a,b)=>b.date.localeCompare(a.date));
+      const today=new Date().toISOString().slice(0,10);
+      el.innerHTML=`<div class="d-flex flex-wrap gap-2 align-items-center mb-3"><div class="fw-bold">Daily attendance · ${esc(selected?.name||'Student')}</div><select id="attStudentSwitch" class="form-select form-select-sm" style="max-width:240px;border-radius:999px">${students.map(student=>`<option value="${student.id}" ${student.id===State.teacherSelectedStudentId?'selected':''}>${esc(student.name)} · ${esc(student.roll)}</option>`).join('')}</select><label class="small fw-semibold ms-auto" for="attClassDate">Class date</label><input id="attClassDate" type="date" class="form-control form-control-sm" style="max-width:170px" value="${today}" max="${today}"></div>
+        <div class="alert alert-info small">Choose the scheduled date and mark each subject Present or Absent. The dated log is the source for the student's attendance total and 75% projections.</div>
+        <div class="card-saas"><div class="card-header-saas"><div><div class="fw-bold">Subject attendance for ${esc(selected?.name||'Student')}</div><div class="small text-muted">Current totals are calculated from dated class records.</div></div><span class="badge rounded-pill bg-light text-dark">${attendance.length} subjects</span></div>
+        <div class="table-responsive"><table class="table table-saas mb-0"><thead><tr><th>Subject</th><th>Current</th><th>Attendance</th><th>Mark class</th></tr></thead><tbody>${attendance.map(record=>{
+          const subject=subjectById.get(Number(record.subjectId))||{name:`Subject ${record.subjectId}`,code:''};
+          const percentage=calculateAttendance(record.attendedClasses,record.totalClasses);
+          const state=getAttendanceStatus(percentage);
+          const last=history.find(item=>Number(item.subjectId)===Number(record.subjectId)&&item.date===today);
+          return `<tr><td><div class="small fw-bold">${esc(subject.name)}</div><div class="small text-muted">${esc(subject.code||'')}</div></td><td class="small">${record.attendedClasses}/${record.totalClasses}</td><td><span class="fw-bold ${state.met?'text-success':'text-danger'}">${percentage.toFixed(1)}%</span></td><td><div class="d-flex gap-2 align-items-center"><select id="att-status-${record.subjectId}" class="form-select form-select-sm" style="max-width:130px"><option value="present" ${last?.status==='present'?'selected':''}>Present</option><option value="absent" ${last?.status==='absent'?'selected':''}>Absent</option></select><button class="btn btn-primary-saas btn-sm" onclick="markAttendanceFor(${record.subjectId})">${last?'Update':'Record'}</button></div></td></tr>`;
+        }).join('')}</tbody></table></div></div>
+        <div class="card-saas mt-3"><div class="card-header-saas"><div class="fw-bold">Recent class records</div><span class="small text-muted">${history.length} records</span></div>${history.length?`<div class="table-responsive" style="max-height:360px;overflow:auto"><table class="table table-saas mb-0"><thead><tr><th>Date</th><th>Subject</th><th>Status</th></tr></thead><tbody>${history.slice(0,40).map(item=>`<tr><td class="small">${fmtDate(item.date)}</td><td class="small">${esc(subjectById.get(Number(item.subjectId))?.name||'Subject')}</td><td><span class="badge rounded-pill ${item.status==='present'?'bg-success':'bg-danger'}">${item.status==='present'?'Present':'Absent'}</span></td></tr>`).join('')}</tbody></table></div>`:`<div class="small text-muted p-3">No dated class records yet.</div>`}</div>`;
+      document.getElementById('attStudentSwitch').addEventListener('change',event=>{State.teacherSelectedStudentId=Number(event.target.value);loadTeacherAttendance();});
+      window.markAttendanceFor=async subjectId=>{
+        const date=document.getElementById('attClassDate')?.value;
+        const status=document.getElementById(`att-status-${subjectId}`)?.value;
         try{
-          await API.updateAttendance(sid, State.teacherSelectedStudentId, {totalClasses: total, attendedClasses: att});
-          const perc=calculateAttendance(att,total);
-          const cell=document.getElementById(`att-perc-${sid}`);
-          if(cell) cell.textContent=perc.toFixed(1)+'%';
-          toast(`Attendance for ${selName} saved (${perc.toFixed(1)}%). The student will see the updated value after refresh.`, 'success');
-          // teacher: refresh his faculty dashboard (no student views on this page anymore)
+          await API.recordAttendance({subjectId,studentId:State.teacherSelectedStudentId,date,status});
+          toast(`Attendance recorded for ${fmtDate(date)}.`,'success');
+          await loadTeacherAttendance();
           loadTeacherDashboard();
-        }catch(e){ toast(e.message,'error'); }
+        }catch(error){toast(error.message||'Could not record attendance','error');}
       };
-    }catch(e){ el.innerHTML=`<div class="small text-danger">${esc(e.message)}</div>`; }
+    }catch(error){el.innerHTML=`<div class="small text-danger">${esc(error.message)}</div>`;}
   }
 
   async function loadTeacherAssignments(){
@@ -1320,21 +1452,23 @@
   function openAttendanceModal(sid){
     const el=$('#attendanceModal'); if(!el) return;
     $('#attSubjectId').value=sid;
+    const dateInput=$('#attClassDate');
+    const today=new Date().toISOString().slice(0,10);
+    dateInput.value=today; dateInput.max=today;
     const m=new bootstrap.Modal(el); m.show();
   }
   async function handleAttendance(e){
     e.preventDefault();
     const sid=parseInt($('#attSubjectId').value);
-    const total=parseInt($('#attTotal').value);
-    const attended=parseInt($('#attAttended').value);
-    if(attended>total){ toast('Attended cannot exceed Total','error'); return; }
-    const effId = State.role==='teacher' ? State.teacherSelectedStudentId : State.studentId;
+    const date=$('#attClassDate').value;
+    const status=$('#attStatus').value;
     try{
-      await API.updateAttendance(sid, effId, {totalClasses:total, attendedClasses:attended});
-      toast('Attendance updated via PUT /api/attendance','success');
+      await API.recordAttendance({subjectId:sid,studentId:State.teacherSelectedStudentId,date,status});
+      toast(`Attendance recorded for ${fmtDate(date)}.`,'success');
       bootstrap.Modal.getInstance($('#attendanceModal')).hide();
-      if(State.role==='teacher'){ loadTeacherDashboard(); if(State.currentSubjectId) openSubject(State.currentSubjectId); }
-      else { loadAttendanceView(); loadDashboard(); }
+      await loadTeacherAttendance();
+      loadTeacherDashboard();
+      if(State.currentSubjectId) openSubject(State.currentSubjectId);
     }catch(err){ toast(err.message,'error'); }
   }
   async function handleAddSubject(e){
@@ -1359,6 +1493,7 @@
       toast(`✓ Subject "${created.name}" saved (${created.code})`,'success');
       bootstrap.Modal.getInstance($('#addSubjectModal')).hide();
       e.target.reset();
+      if(State.currentUser?.role==='teacher' && e.target.elements.faculty) e.target.elements.faculty.value=State.currentUser.name;
       // refresh views
       if(State.role==='teacher'){ await loadTeacherSubjects(); await loadTeacherDashboard(); } else { await loadSubjectsView(); await loadDashboard(); }
       // switch to subjects to show new one
@@ -1453,6 +1588,9 @@
       if(rEl) rEl.textContent = State.role==='student' ? 'MCA/2024/017 • Sem 1 • Demo' : 'Teacher • Demo';
       return;
     }
+    // Subject ownership is bound to the authenticated faculty account, not form input.
+    const facultyInput=$('#addSubjectForm [name="faculty"]');
+    if(facultyInput && u.role==='teacher') facultyInput.value=u.name;
     // update topbar name/role
     if(nEl) nEl.textContent = u.name;
     if(rEl) {
@@ -1561,7 +1699,8 @@
     const addAssignmentForm=$('#addAssignmentForm'); if(addAssignmentForm) addAssignmentForm.addEventListener('submit', handleAddAssignment);
     const submitForm=$('#submitForm'); if(submitForm) submitForm.addEventListener('submit', handleSubmitAssignment);
     const gradeForm=$('#gradeForm'); if(gradeForm) gradeForm.addEventListener('submit', handleGrade);
-    const attForm=$('#attendanceForm'); if(attForm) attForm.addEventListener('submit', handleAttendance);
+        const attForm=$('#attendanceForm'); if(attForm) attForm.addEventListener('submit', handleAttendance);
+        const timetableForm=$('#timetableForm'); if(timetableForm) timetableForm.addEventListener('submit', handleTimetableSave);
 
     window.switchSemester=(n)=>{
       State.semester=n;

@@ -12,6 +12,7 @@ process.env.DATA_DIR = temp;
 process.env.UPLOAD_DIR = path.join(temp, 'uploads');
 process.env.JWT_SECRET = 'test-secret-for-unit-tests';
 process.env.NODE_ENV = 'test';
+process.env.TEACHER_REGISTRATION_CODE = 'test-invite-secret';
 const { app, db } = require('../server');
 let server;
 let base;
@@ -30,6 +31,13 @@ async function login(identifier, role, password = '1234') {
   const response = await fetch(`${base}/api/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier, role, password })
+  });
+  const data = await response.json();
+  return { response, data, cookie: response.headers.get('set-cookie')?.split(';')[0] };
+}
+async function register(payload) {
+  const response = await fetch(`${base}/api/auth/register`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
   });
   const data = await response.json();
   return { response, data, cookie: response.headers.get('set-cookie')?.split(';')[0] };
@@ -79,6 +87,72 @@ test('student and teacher passwords are verified and role-bound', async () => {
   assert.equal(wrongRole.response.status, 401);
 });
 
+test('registration creates secure student accounts and invitation-only teacher accounts', async () => {
+  const student = await register({ name: 'New Student', email: 'new.student@example.edu', roll: 'MCA/2026/001', semester: 1, password: 'A-strong-pass-1', role: 'student' });
+  assert.equal(student.response.status, 201);
+  assert.equal(student.data.user.role, 'student');
+  assert.ok(student.data.accessToken);
+  const own = await api('/students', student.cookie);
+  assert.ok(own.data.some(user => user.email === 'new.student@example.edu'));
+  const attendance = await api('/attendance?studentId=' + student.data.user.id, student.cookie);
+  assert.ok(attendance.data.length > 0);
+
+  const duplicate = await register({ name: 'Duplicate Student', email: 'NEW.STUDENT@example.edu', roll: 'MCA/2026/002', semester: 1, password: 'A-strong-pass-1', role: 'student' });
+  assert.equal(duplicate.response.status, 409);
+  const duplicateRoll = await register({ name: 'Duplicate Roll', email: 'other.student@example.edu', roll: 'MCA/2026/001', semester: 1, password: 'A-strong-pass-1', role: 'student' });
+  assert.equal(duplicateRoll.response.status, 409);
+
+  const savedCode = process.env.TEACHER_REGISTRATION_CODE;
+  delete process.env.TEACHER_REGISTRATION_CODE;
+  const disabledInvite = await register({ name: 'New Teacher', email: 'new.teacher@example.edu', password: 'A-strong-pass-1', role: 'teacher' });
+  assert.equal(disabledInvite.response.status, 403);
+  process.env.TEACHER_REGISTRATION_CODE = savedCode;
+  const noInvite = await register({ name: 'New Teacher', email: 'new.teacher@example.edu', password: 'A-strong-pass-1', role: 'teacher' });
+  assert.equal(noInvite.response.status, 403);
+  const teacher = await register({ name: 'New Teacher', email: 'new.teacher@example.edu', password: 'A-strong-pass-1', role: 'teacher', inviteCode: 'test-invite-secret' });
+  assert.equal(teacher.response.status, 201);
+  assert.equal(teacher.data.user.role, 'teacher');
+  assert.deepEqual((await api('/subjects', teacher.cookie)).data, []);
+});
+
+test('teachers can only see or change records owned by their subjects', async () => {
+  const rajesh = await login('rajesh.kumar@bitmesra.ac.in', 'teacher');
+  const anjali = await login('anjali.mehta@bitmesra.ac.in', 'teacher');
+  const semesterFourStudent = await register({ name: 'Semester Four', email: 'semester.four@example.edu', roll: 'MCA/2025/099', semester: 4, password: 'A-strong-pass-1', role: 'student' });
+  assert.equal(semesterFourStudent.response.status, 201);
+  assert.equal((await api(`/students/${semesterFourStudent.data.user.id}`, rajesh.cookie)).response.status, 403);
+  const rajSubjects = await api('/subjects', rajesh.cookie);
+  const anjaliSubjects = await api('/subjects', anjali.cookie);
+  assert.ok(rajSubjects.data.some(subject => subject.id === 1));
+  assert.ok(!rajSubjects.data.some(subject => subject.id === 2));
+  assert.ok(anjaliSubjects.data.some(subject => subject.id === 2));
+  assert.ok(!anjaliSubjects.data.some(subject => subject.id === 1));
+  const rajAttendance = await api('/attendance?studentId=101', rajesh.cookie);
+  assert.ok(rajAttendance.data.length > 0);
+  assert.ok(rajAttendance.data.every(record => [1,3,5,7,8].includes(record.subjectId)));
+  const anjaliMarks = await api('/quizzes?studentId=101', anjali.cookie);
+  assert.ok(anjaliMarks.data.length > 0);
+  assert.ok(anjaliMarks.data.every(record => [2,4].includes(record.subjectId)));
+  const deniedRead = await api('/subjects/2', rajesh.cookie);
+  assert.equal(deniedRead.response.status, 403);
+  const deniedWrite = await api('/attendance/upsert', rajesh.cookie, { method: 'PUT', body: JSON.stringify({ subjectId: 2, studentId: 101, totalClasses: 10, attendedClasses: 8 }) });
+  assert.equal(deniedWrite.response.status, 403);
+  const allowedWrite = await api('/attendance/upsert', anjali.cookie, { method: 'PUT', body: JSON.stringify({ subjectId: 2, studentId: 101, totalClasses: 10, attendedClasses: 8 }) });
+  assert.equal(allowedWrite.response.status, 200);
+  const deniedGrade = await api('/submissions/1', anjali.cookie, { method: 'PUT', body: JSON.stringify({ marks: 17, feedback: 'Reviewed' }) });
+  assert.equal(deniedGrade.response.status, 403);
+  const rajAssignments = await api('/assignments', rajesh.cookie);
+  const anjaliAssignments = await api('/assignments', anjali.cookie);
+  assert.ok(rajAssignments.data.some(assignment => assignment.id === 1));
+  assert.ok(!anjaliAssignments.data.some(assignment => assignment.id === 1));
+  assert.equal((await api('/assignments/1', anjali.cookie)).response.status, 403);
+  assert.equal((await api('/submissions/1/files/0', anjali.cookie)).response.status, 403);
+  const forbiddenAssignment = await api('/assignments', anjali.cookie, { method: 'POST', body: JSON.stringify({ subjectId: 1, title: 'Out of scope', description: '', maxMarks: 10, deadline: '2026-12-10' }) });
+  assert.equal(forbiddenAssignment.response.status, 403);
+  const allowedGrade = await api('/submissions/1', rajesh.cookie, { method: 'PUT', body: JSON.stringify({ marks: 17, feedback: 'Reviewed by the assigned teacher' }) });
+  assert.equal(allowedGrade.response.status, 200);
+});
+
 test('student data access is scoped; teacher can see the class roster', async () => {
   const student = await login('MCA/2024/017', 'student');
   const own = await api('/students', student.cookie);
@@ -93,7 +167,7 @@ test('student data access is scoped; teacher can see the class roster', async ()
   assert.ok(ownAttendance.data.every(x => x.studentId === 101));
   const teacher = await login('rajesh.kumar@bitmesra.ac.in', 'teacher');
   const roster = await api('/students', teacher.cookie);
-  assert.equal(roster.data.length, 4);
+  assert.equal(roster.data.length, 5);
 });
 
 test('students cannot write teacher data; teacher edits validate and persist', async () => {
@@ -163,4 +237,78 @@ test('assignment submissions upload to disk and are permission-checked on downlo
   const otherStudent = await login('priya.sharma@bitmesra.ac.in', 'student');
   const denied = await api(`/submissions/${created.data.id}/file`, otherStudent.cookie);
   assert.equal(denied.response.status, 403);
+});
+
+test('weekly timetable, dated attendance, and demo fee receipts stay scoped and persist', async () => {
+  const student = await login('manoj.das@bitmesra.ac.in', 'student');
+  const timetable = await api('/timetable', student.cookie);
+  assert.equal(timetable.response.status, 200);
+  assert.ok(timetable.data.length >= 18);
+  assert.ok(timetable.data.every(slot => slot.day && slot.startTime && slot.endTime && slot.room && slot.subjectName && slot.teacherEmail));
+
+  const teacher = await login('rajesh.kumar@bitmesra.ac.in', 'teacher');
+  const createdClass = await api('/timetable', teacher.cookie, { method: 'POST', body: JSON.stringify({ subjectId: 1, day: 'Sunday', startTime: '08:00', endTime: '09:00', room: 'Room T-901' }) });
+  assert.equal(createdClass.response.status, 201);
+  const newStudentView = await api('/timetable', student.cookie);
+  assert.ok(newStudentView.data.some(slot => slot.id === createdClass.data.id && slot.room === 'Room T-901' && slot.teacherEmail === 'rajesh.kumar@bitmesra.ac.in'));
+  const badTime = await api('/timetable', teacher.cookie, { method: 'POST', body: JSON.stringify({ subjectId: 1, day: 'Sunday', startTime: '25:00', endTime: '26:00', room: 'Room T-902' }) });
+  assert.equal(badTime.response.status, 400);
+  const overlappingClass = await api('/timetable', teacher.cookie, { method: 'POST', body: JSON.stringify({ subjectId: 1, day: 'Monday', startTime: '09:30', endTime: '10:30', room: 'Room T-903' }) });
+  assert.equal(overlappingClass.response.status, 409);
+  const outOfScopeClass = await api('/timetable', teacher.cookie, { method: 'POST', body: JSON.stringify({ subjectId: 2, day: 'Sunday', startTime: '10:00', endTime: '11:00', room: 'Room T-904' }) });
+  assert.equal(outOfScopeClass.response.status, 403);
+  const forbiddenStudentEdit = await api(`/timetable/${createdClass.data.id}`, student.cookie, { method: 'PUT', body: JSON.stringify({ room: 'Changed' }) });
+  assert.equal(forbiddenStudentEdit.response.status, 403);
+  const changedClass = await api(`/timetable/${createdClass.data.id}`, teacher.cookie, { method: 'PUT', body: JSON.stringify({ subjectId: 1, day: 'Sunday', startTime: '09:00', endTime: '10:00', room: 'Room T-905' }) });
+  assert.equal(changedClass.response.status, 200);
+  assert.equal((await api('/timetable', student.cookie)).data.find(slot => slot.id === createdClass.data.id).room, 'Room T-905');
+  assert.equal((await api(`/timetable/${createdClass.data.id}`, teacher.cookie, { method: 'DELETE' })).response.status, 200);
+  assert.ok(!(await api('/timetable', student.cookie)).data.some(slot => slot.id === createdClass.data.id));
+  const classDate = '2025-01-06'; // Monday; subject 1 is scheduled on Mondays.
+  const marked = await api('/attendanceSessions', teacher.cookie, {
+    method: 'POST', body: JSON.stringify({ subjectId: 1, studentId: 101, date: classDate, status: 'present' })
+  });
+  assert.equal(marked.response.status, 201);
+  const studentSessions = await api('/attendanceSessions?studentId=101', student.cookie);
+  assert.ok(studentSessions.data.some(record => record.date === classDate && record.subjectId === 1 && record.status === 'present'));
+  const summaryAfterMark = (await api('/attendance?subjectId=1', student.cookie)).data.find(record => record.subjectId === 1);
+  const totalAfterMark = summaryAfterMark.totalClasses;
+  const attendedAfterMark = summaryAfterMark.attendedClasses;
+  const corrected = await api('/attendanceSessions', teacher.cookie, {
+    method: 'POST', body: JSON.stringify({ subjectId: 1, studentId: 101, date: classDate, status: 'absent' })
+  });
+  assert.equal(corrected.response.status, 200);
+  const afterCorrection = (await api('/attendance?subjectId=1', student.cookie)).data.find(record => record.subjectId === 1);
+  assert.equal(afterCorrection.totalClasses, totalAfterMark);
+  assert.equal(afterCorrection.attendedClasses, attendedAfterMark - 1);
+  const forbiddenMark = await api('/attendanceSessions', student.cookie, {
+    method: 'POST', body: JSON.stringify({ subjectId: 1, studentId: 101, date: '2025-01-13', status: 'present' })
+  });
+  assert.equal(forbiddenMark.response.status, 403);
+  const crossTeacherMark = await api('/attendanceSessions', (await login('anjali.mehta@bitmesra.ac.in', 'teacher')).cookie, {
+    method: 'POST', body: JSON.stringify({ subjectId: 1, studentId: 101, date: '2025-01-13', status: 'present' })
+  });
+  assert.equal(crossTeacherMark.response.status, 403);
+
+  const account = await register({ name: 'Fee Test Student', email: 'fee.test@example.edu', roll: 'MCA/2026/fee', semester: 1, password: 'A-strong-pass-1', role: 'student' });
+  assert.equal(account.response.status, 201);
+  const ownInvoices = await api('/fees', account.cookie);
+  assert.equal(ownInvoices.data.length, 1);
+  assert.equal(ownInvoices.data[0].amountInr, 50000);
+  const paid = await api(`/fees/${ownInvoices.data[0].id}/demo-pay`, account.cookie, { method: 'POST', body: JSON.stringify({}) });
+  assert.equal(paid.response.status, 201);
+  assert.equal(paid.data.status, 'demo-paid');
+  assert.match(paid.data.receiptNo, /^DEMO-/);
+  assert.match(paid.data.paymentMethod, /no money charged/i);
+  const receipt = await api('/feePayments', account.cookie);
+  assert.equal(receipt.data.length, 1);
+  assert.equal(receipt.data[0].id, paid.data.id);
+  const paidInvoice = await api('/fees', account.cookie);
+  assert.equal(paidInvoice.data[0].status, 'paid');
+  const duplicatePay = await api(`/fees/${ownInvoices.data[0].id}/demo-pay`, account.cookie, { method: 'POST', body: JSON.stringify({}) });
+  assert.equal(duplicatePay.response.status, 409);
+  const otherStudentInvoices = await api('/fees', student.cookie);
+  assert.ok(otherStudentInvoices.data.every(invoice => invoice.studentId === 101));
+  assert.ok(!otherStudentInvoices.data.some(invoice => invoice.id === ownInvoices.data[0].id));
+  assert.equal((await api(`/fees/${ownInvoices.data[0].id}/demo-pay`, student.cookie, { method: 'POST', body: JSON.stringify({}) })).response.status, 403);
 });

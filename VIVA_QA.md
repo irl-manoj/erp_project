@@ -32,7 +32,7 @@ No. It is an educational demonstration. Bundled accounts, marks, attendance, and
 
 **7. How does login work?**
 
-The server finds the account by email or student roll number, compares the submitted password with a bcrypt hash, and issues a signed, 12-hour session. It uses an HttpOnly cookie where available and a short-lived bearer-token fallback for embedded previews. The selected role must match the account.
+Students can register using a unique roll number, email, semester, and password. Teacher registration requires an administrator-configured invitation code. At login, the server finds the account by email or roll number, verifies the bcrypt password hash, checks the account role, and issues a signed, 12-hour session using a secure cookie plus a short-lived token fallback for embedded previews.
 
 **8. Are passwords stored in plaintext?**
 
@@ -40,11 +40,11 @@ No. Passwords are stored as bcrypt hashes. The included demo accounts share a de
 
 **9. How are student records kept private?**
 
-The API identifies the user from the signed session cookie and enforces role and ownership checks on the server. A student cannot gain access to another student's data by changing an ID in the browser.
+The API identifies the user from the session and enforces role and ownership checks on the server. Students can only read their own academic records. Teachers can read or change marks, assignments, and submissions only for subjects assigned to their account; modifying an ID or role in the browser cannot bypass those checks.
 
 **10. What can a teacher do?**
 
-An authenticated teacher can view the class roster and manage subjects, attendance, marks, assignments, and submission grades. Student accounts are not authorized to make teacher-only changes.
+An authenticated teacher can view students in semesters where they teach, and manage only their assigned subjects, attendance, marks, assignments, and submission grades. Teacher ownership is enforced on the backend; student accounts cannot make teacher-only changes.
 
 **11. What security controls are included?**
 
@@ -98,7 +98,7 @@ Browser storage is local to one browser and cannot safely provide shared multi-u
 
 **22. Does the application support self-registration or password reset?**
 
-Not yet. It currently seeds sample student and teacher accounts. A real deployment needs an approved process for account provisioning and password recovery.
+Yes. Students can register with a unique roll number, email, semester, and password; teacher registration is restricted by an invitation code configured in the server environment. Password reset and administrator account management are not included yet.
 
 **23. Can it be deployed as-is for a full institution?**
 

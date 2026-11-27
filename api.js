@@ -25,6 +25,26 @@ const MockDB = (() => {
         { id: 7, name: "Computer Networks", code: "MCA-CN", faculty: "Prof. Rajesh Kumar", semester: 2, credits: 4, type: "theory", color: "#1d4ed8" },
         { id: 8, name: "Java Lab", code: "MCA-JAVA-LAB", faculty: "Prof. Rajesh Kumar", semester: 2, credits: 2, type: "lab", color: "#0d9488" },
     ];
+    const timetable = [
+        { id: 1, subjectId: 1, day: 'Monday', startTime: '09:00', endTime: '10:00', room: 'Room 201' },
+        { id: 2, subjectId: 2, day: 'Monday', startTime: '10:00', endTime: '11:00', room: 'Room 202' },
+        { id: 3, subjectId: 3, day: 'Monday', startTime: '11:00', endTime: '12:00', room: 'Room 203' },
+        { id: 4, subjectId: 5, day: 'Monday', startTime: '14:00', endTime: '16:00', room: 'DBMS Lab 1' },
+        { id: 5, subjectId: 4, day: 'Tuesday', startTime: '09:00', endTime: '10:00', room: 'Room 204' },
+        { id: 6, subjectId: 1, day: 'Tuesday', startTime: '10:00', endTime: '11:00', room: 'Room 201' },
+        { id: 7, subjectId: 7, day: 'Tuesday', startTime: '14:00', endTime: '15:00', room: 'Room 301' },
+        { id: 8, subjectId: 2, day: 'Wednesday', startTime: '09:00', endTime: '10:00', room: 'Room 202' },
+        { id: 9, subjectId: 3, day: 'Wednesday', startTime: '10:00', endTime: '11:00', room: 'Room 203' },
+        { id: 10, subjectId: 5, day: 'Wednesday', startTime: '14:00', endTime: '16:00', room: 'DBMS Lab 1' },
+        { id: 11, subjectId: 1, day: 'Thursday', startTime: '09:00', endTime: '10:00', room: 'Room 201' },
+        { id: 12, subjectId: 4, day: 'Thursday', startTime: '10:00', endTime: '11:00', room: 'Room 204' },
+        { id: 13, subjectId: 6, day: 'Thursday', startTime: '14:00', endTime: '15:00', room: 'Room 301' },
+        { id: 14, subjectId: 2, day: 'Friday', startTime: '09:00', endTime: '10:00', room: 'Room 202' },
+        { id: 15, subjectId: 3, day: 'Friday', startTime: '10:00', endTime: '11:00', room: 'Room 203' },
+        { id: 16, subjectId: 7, day: 'Friday', startTime: '12:00', endTime: '13:00', room: 'Room 301' },
+        { id: 17, subjectId: 8, day: 'Saturday', startTime: '09:00', endTime: '11:00', room: 'Java Lab 2' },
+        { id: 18, subjectId: 5, day: 'Saturday', startTime: '11:00', endTime: '13:00', room: 'DBMS Lab 1' },
+    ];
 
     // Base quiz data for student 101 - will replicate for other students with variation
     const baseQuizzes = [
@@ -127,6 +147,29 @@ const MockDB = (() => {
         });
     });
 
+    // Sample dated records mirror each aggregate total so students can see the dates they attended or missed.
+    const weekdayIndex = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    const attendanceSessions = [];
+    for (const summary of attendance) {
+        const classDays = new Set(timetable.filter(item => item.subjectId === summary.subjectId).map(item => weekdayIndex[item.day]));
+        const dates = [];
+        const cursor = new Date(Date.UTC(2026, 10, 27, 12));
+        for (let step = 0; step < 1200 && dates.length < summary.totalClasses; step++) {
+            if (classDays.has(cursor.getUTCDay())) dates.push(cursor.toISOString().slice(0, 10));
+            cursor.setUTCDate(cursor.getUTCDate() - 1);
+        }
+        dates.reverse();
+        for (let index = 0; index < dates.length; index++) {
+            const present = Math.floor((index + 1) * summary.attendedClasses / summary.totalClasses) > Math.floor(index * summary.attendedClasses / summary.totalClasses);
+            attendanceSessions.push({ id: `${summary.subjectId}-${summary.studentId}-${dates[index]}`, subjectId: summary.subjectId, studentId: summary.studentId, date: dates[index], status: present ? 'present' : 'absent' });
+        }
+    }
+    const fees = students.map((student, index) => ({
+        id: 7001 + index, studentId: student.id, academicYear: '2026–27', semester: student.semester,
+        description: 'Semester academic fee (sample invoice)', amountInr: 50000, dueDate: '2026-12-31', status: 'due', sample: true
+    }));
+    const feePayments = [];
+
     const assignments = [
         { id: 1, subjectId: 1, title: "DBMS Normalization Assignment", description: "Solve 3NF and BCNF problems with examples. Submit as PDF.", maxMarks: 20, deadline: "2024-09-30", createdAt: "2024-09-15", fileUrl: "#", status: "checked", submissionsCount: 42 },
         { id: 2, subjectId: 1, title: "ER Diagram Case Study", description: "Design ER diagram for Hospital Management System.", maxMarks: 10, deadline: "2024-10-20", createdAt: "2024-10-02", fileUrl: "#", status: "pending", submissionsCount: 28 },
@@ -207,7 +250,7 @@ const MockDB = (() => {
     loadPersisted();
 
     return {
-        students, teachers, subjects, quizzes, internals, endSems, labMarks, attendance, assignments, submissions, exams, notices, notes, syllabus, notifications,
+        students, teachers, subjects, timetable, quizzes, internals, endSems, labMarks, attendance, attendanceSessions, fees, feePayments, assignments, submissions, exams, notices, notes, syllabus, notifications,
         persist,
         get errorRate() { return errorRate; }, setErrorRate(v) { errorRate = v; }
     };

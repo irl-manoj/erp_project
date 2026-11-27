@@ -44,6 +44,8 @@
       <button class="nav-link" data-view="teacher-submissions" data-teacher-only><i class="fa-solid fa-inbox"></i>Submissions</button>
 
       <div class="nav-section-title">System</div>
+      <button class="nav-link" data-view="timetable"><i class="fa-solid fa-calendar-week"></i>Timetable</button>
+      <button class="nav-link" data-view="fees" data-student-only><i class="fa-solid fa-receipt"></i>Fees &amp; Receipts</button>
       <button class="nav-link" data-view="notices"><i class="fa-solid fa-bullhorn"></i>Notices</button>
       <button class="nav-link" data-view="notes"><i class="fa-solid fa-file-lines"></i>Notes</button>
       <button class="nav-link" data-view="syllabus"><i class="fa-solid fa-layer-group"></i>Syllabus</button>
@@ -160,6 +162,8 @@
       <!-- Student views use the same server API, scoped to the authenticated student. -->
       <div class="view-section d-none" data-view="subjects"><h4 class="page-title">My Subjects</h4><div id="subjectsView"></div></div>
       <div class="view-section d-none" data-view="attendance"><h4 class="page-title">Attendance</h4><div id="attendanceView"></div></div>
+      <div class="view-section d-none" data-view="timetable"><h4 class="page-title">Weekly Timetable</h4><div id="timetableView"></div></div>
+      <div class="view-section d-none" data-view="fees" data-student-only><h4 class="page-title">Fees &amp; Receipts</h4><div id="feesView"></div></div>
       <div class="view-section d-none" data-view="quiz"><h4 class="page-title">Quiz &amp; Marks</h4><div id="quizView"></div></div>
       <div class="view-section d-none" data-view="internal"><h4 class="page-title">Internal Marks</h4><div id="internalView"></div></div>
       <div class="view-section d-none" data-view="assignments"><h4 class="page-title">Assignments</h4><div id="assignmentsView"></div></div>
@@ -191,7 +195,7 @@
         <div class="row g-3">
           <div class="col-12"><label class="small fw-semibold">Subject Name</label><input name="name" class="form-control form-control-saas" placeholder="Database Management System" required></div>
           <div class="col-6"><label class="small fw-semibold">Subject Code</label><input name="code" class="form-control form-control-saas" placeholder="MCA-DBMS" required></div>
-          <div class="col-6"><label class="small fw-semibold">Faculty Name</label><input name="faculty" class="form-control form-control-saas" placeholder="Prof. Rajesh Kumar" required></div>
+          <div class="col-6"><label class="small fw-semibold">Assigned Faculty</label><input name="faculty" class="form-control form-control-saas" placeholder="Your account name" readonly required></div>
           <div class="col-4"><label class="small fw-semibold">Semester</label><select name="semester" class="form-select form-select-saas"><option value="1">Sem 1</option><option value="2">Sem 2</option><option value="3">Sem 3</option><option value="4">Sem 4</option></select></div>
           <div class="col-4"><label class="small fw-semibold">Credits</label><input name="credits" type="number" min="1" max="10" class="form-control form-control-saas" value="4" required><div class="small text-muted">>0 required</div></div>
           <div class="col-4"><label class="small fw-semibold">Subject Type</label><select name="type" class="form-select form-select-saas"><option value="theory">Theory</option><option value="lab">Lab / Practical</option><option value="elective">Elective</option></select></div>
@@ -236,6 +240,24 @@
   </div>
 </div>
 
+<!-- Teacher timetable modal -->
+<div class="modal fade" id="timetableModal" data-teacher-only tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="timetableForm">
+      <div class="modal-header"><h6 class="modal-title" id="timetableModalTitle">Add timetable class</h6><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <input type="hidden" name="id">
+        <label class="small fw-semibold" for="timetableSubject">Subject</label><select id="timetableSubject" name="subjectId" class="form-select form-control-saas mb-2" required></select>
+        <label class="small fw-semibold" for="timetableDay">Day</label><select id="timetableDay" name="day" class="form-select form-control-saas mb-2" required><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select>
+        <div class="row g-2"><div class="col-6"><label class="small fw-semibold" for="timetableStart">Start time</label><input id="timetableStart" name="startTime" type="time" class="form-control form-control-saas" required></div><div class="col-6"><label class="small fw-semibold" for="timetableEnd">End time</label><input id="timetableEnd" name="endTime" type="time" class="form-control form-control-saas" required></div></div>
+        <label class="small fw-semibold mt-2" for="timetableRoom">Room</label><input id="timetableRoom" name="room" class="form-control form-control-saas" maxlength="80" placeholder="e.g. Room 201" required>
+        <div class="small text-muted mt-2">Classes are visible to students after saving. The server checks subject ownership, time validity, and teacher/room conflicts.</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-ghost" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary-saas" type="submit">Save class</button></div>
+    </form>
+  </div>
+</div>
+
 <!-- Attendance Modal -->
 <div class="modal fade" id="attendanceModal" data-teacher-only tabindex="-1">
   <div class="modal-dialog modal-sm">
@@ -243,9 +265,9 @@
       <div class="modal-header"><h6 class="modal-title">Update Attendance</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <input type="hidden" id="attSubjectId">
-        <label class="small fw-semibold">Total Classes</label><input id="attTotal" type="number" class="form-control form-control-saas mb-2" value="40" min="0" required>
-        <label class="small fw-semibold">Attended</label><input id="attAttended" type="number" class="form-control form-control-saas" value="34" min="0" required>
-        <div class="small text-muted mt-2">Validated: Attended ≤ Total</div>
+        <label class="small fw-semibold">Class date</label><input id="attClassDate" type="date" class="form-control form-control-saas mb-2" required>
+        <label class="small fw-semibold">Status</label><select id="attStatus" class="form-select form-control-saas"><option value="present">Present</option><option value="absent">Absent</option></select>
+        <div class="small text-muted mt-2">Only dates scheduled for this subject can be recorded. Saving updates the dated attendance history.</div>
       </div>
       <div class="modal-footer"><button class="btn btn-primary-saas w-100" type="submit">Save</button></div>
     </form>
@@ -269,9 +291,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="js/config.js"></script>
-<script src="calculations.js"></script>
-<script src="js/api.js?v=loginfix4"></script>
+<script src="calculations.js?v=attendance-projection1"></script>
+<script src="js/api.js?v=timetable-management1"></script>
 <script src="charts.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=timetable-retryfix1"></script>
   <footer class="legal-strip"><span>MCA Academic Dashboard &copy; 2026, Department of Computer Applications, BIT Mesra (demo project).</span><span class="ms-auto"><a href="privacy.html" rel="noopener">Privacy Policy</a> &middot; <a href="terms.html" rel="noopener">Terms</a></span></footer>
 </body></html>
