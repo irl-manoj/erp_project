@@ -23,7 +23,7 @@ test('browser loads real API client and verifies the server session before dashb
   const client = read('js/api.js');
   const app = read('app.js');
   const login = read('login.html');
-  assert.match(html, /src="js\/api\.js"/);
+  assert.match(html, /src="js\/api\.js\?v=loginfix3"/);
   assert.match(client, /fetch\(/);
   assert.match(client, /\/auth\/login/);
   assert.match(client, /\/auth\/me/);
