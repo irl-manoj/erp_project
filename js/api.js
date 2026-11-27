@@ -4,17 +4,26 @@
   const API_BASE = (window.CONFIG && window.CONFIG.API_BASE_URL) || '/api';
   const USER_KEY = 'mca_current_user';
   const TOKEN_KEY = 'mca_access_token';
+  let memoryToken = null;
 
-  function sessionHeaders() {
-    const headers = new Headers();
+  function readToken() {
+    if (memoryToken) return memoryToken;
     try {
       const token = sessionStorage.getItem(TOKEN_KEY);
-      if (token) headers.set('Authorization', `Bearer ${token}`);
+      if (token) return token;
     } catch {}
+    try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  }
+  function sessionHeaders() {
+    const headers = new Headers();
+    const token = readToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
     return headers;
   }
   function clearSession() {
+    memoryToken = null;
     try { localStorage.removeItem(USER_KEY); } catch {}
+    try { localStorage.removeItem(TOKEN_KEY); } catch {}
     try { sessionStorage.removeItem(TOKEN_KEY); } catch {}
   }
 
@@ -35,7 +44,7 @@
     const body = contentType.includes('application/json') ? await response.json() : null;
     if (!response.ok) {
       const error = { status: response.status, message: body?.message || `Request failed (${response.status})` };
-      if (response.status === 401 && (path === '/auth/login' || (!location.pathname.endsWith('index.html') && !location.pathname.endsWith('login.html')))) {
+      if (response.status === 401 && (path === '/auth/login' || path === '/auth/me' || (!location.pathname.endsWith('index.html') && !location.pathname.endsWith('login.html')))) {
         clearSession();
       }
       throw error;
@@ -49,8 +58,10 @@
   const API = {
     authenticate: async (identifier, role, password) => {
       const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ identifier, role, password }) });
+      memoryToken = result.accessToken;
       try { localStorage.setItem(USER_KEY, JSON.stringify(result.user)); } catch {}
       try { sessionStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
+      try { localStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
       return result.user;
     },
     login: async (userId) => {

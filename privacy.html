@@ -45,12 +45,12 @@
         <li>Login identifiers and passwords are sent to the same-origin API for verification. Passwords are stored as bcrypt hashes, not plaintext.</li>
         <li>Authenticated profile, attendance, assessment, assignment, and submission records are stored in the server-side SQLite database.</li>
         <li>Assignment attachments and student submissions are stored in private server folders and are returned only through authenticated download routes.</li>
-        <li>The application uses a signed, 12-hour HttpOnly cookie where supported, with a short-lived bearer-token fallback in <code>sessionStorage</code> for embedded preview browsers. A small user display cache is kept in <code>localStorage</code>; academic records are not stored in browser storage.</li>
+        <li>The application uses a signed, 12-hour HttpOnly cookie where supported, with a short-lived bearer-token fallback in <code>sessionStorage</code> and <code>localStorage</code> for embedded preview browsers. Academic records are not stored in browser storage.</li>
       </ul>
       <p>For a local development setup, the database is in <code>data/academic.sqlite</code> and uploaded files are under <code>uploads/</code>. A hosted deployment may use different storage. The operator must protect, back up, and delete stored data according to approved institutional policy.</p>
 
       <h2>3. Browser storage and sessions</h2>
-      <p>The application stores the signed-in user's display profile under <code>mca_current_user</code> in <code>localStorage</code>. A short-lived authentication token may be stored in <code>sessionStorage</code> when embedded preview browsers do not send the HttpOnly cookie. Both mechanisms expire or are cleared when the user logs out. Clearing browser site data does not delete records already stored on the server.</p>
+      <p>The application stores the signed-in user's display profile under <code>mca_current_user</code> in <code>localStorage</code>. A short-lived authentication token is kept in <code>sessionStorage</code> and <code>localStorage</code> as a fallback when embedded preview browsers do not send the HttpOnly cookie. Tokens expire server-side after 12 hours and are cleared when the user logs out. Clearing browser site data does not delete records already stored on the server.</p>
 
       <h2>4. Third-party resources</h2>
       <p>The pages load open-source libraries and fonts from public CDNs (Bootstrap, Chart.js, Font Awesome via jsDelivr; Google Fonts). A request to these providers is made by your browser when a page loads, and standard web requests include technical details such as your IP address and user agent. The library code is not modified and does not collect information on our behalf. If you would rather avoid this, the files can be self-hosted with no functional changes.</p>
