@@ -53,15 +53,21 @@ function sessionCookieOptions(req) {
 function auth(req, _res, next) {
   const authorization = req.get('authorization') || '';
   const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
-  const token = req.cookies[COOKIE_NAME] || bearer;
-  if (!token) return next(httpError(401, 'Please log in to continue.'));
-  try {
-    const payload = jwt.verify(token, JWT_SECRET, { issuer: 'mca-academic-dashboard' });
-    const user = findUserById(payload.sub);
-    if (!user || user.role !== payload.role) return next(httpError(401, 'Session is no longer valid. Please log in again.'));
-    req.user = user;
-    next();
-  } catch { next(httpError(401, 'Your session has expired. Please log in again.')); }
+  const tokens = [...new Set([bearer, req.cookies[COOKIE_NAME]].filter(Boolean))];
+  if (!tokens.length) return next(httpError(401, 'Please log in to continue.'));
+
+  // Embedded browsers can retain an expired cookie while sending a fresh bearer token.
+  // Validate both credentials rather than letting a stale cookie mask a valid login.
+  for (const token of tokens) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET, { issuer: 'mca-academic-dashboard' });
+      const user = findUserById(payload.sub);
+      if (!user || user.role !== payload.role) continue;
+      req.user = user;
+      return next();
+    } catch {}
+  }
+  return next(httpError(401, 'Your session has expired. Please log in again.'));
 }
 function requireRole(...roles) { return (req, _res, next) => roles.includes(req.user.role) ? next() : next(httpError(403, 'You do not have permission to do that.')); }
 function number(value) { const n = Number(value); return Number.isFinite(n) ? n : null; }
