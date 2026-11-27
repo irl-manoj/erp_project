@@ -1,0 +1,4 @@
+/* Student-specific overrides - imports base design system */
+@import url('./style.css');
+/* Student accent */
+.student-hero { background: linear-gradient(135deg, #a30d26, #e11d48); }

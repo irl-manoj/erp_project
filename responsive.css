@@ -1,0 +1,85 @@
+/* Responsive overrides */
+@media (max-width: 576px) {
+  .stat-card .value { font-size: 1.35rem; }
+  .hero-greeting { padding: 20px; border-radius: 16px; }
+  .hero-greeting h2 { font-size: 1.25rem; }
+  .page-title { font-size: 1.25rem; }
+  .chart-wrap { height: 220px; }
+}
+@media (max-width: 768px) {
+  .internal-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 992px) and (max-width: 1199px) {
+  :root { --sidebar-w: 240px; }
+}
+
+
+/* ================== v2 responsive hardening ================== */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+.app-shell { min-width: 0; }
+img, canvas { max-width: 100%; }
+
+/* tablet & down */
+@media (max-width: 1199.98px) {
+  .chart-wrap { height: 230px; }
+  .chart-wrap.sm { height: 175px; }
+  .topbar { gap: 10px; padding: 0 14px; }
+}
+@media (max-width: 991.98px) {
+  .content { padding: 16px 14px; }
+  .hero-greeting { padding: 22px; }
+  .hero-greeting .text-lg-end { text-align: left !important; }
+  .hero-greeting .semester-tabs { justify-content: flex-start; max-width: 100%; overflow-x: auto; }
+  .card-saas .card-body { padding: 16px; }
+  .card-header-saas { padding: 13px 16px; }
+  .sidebar { max-width: 86vw; }
+  .stat-card .value { font-size: 1.5rem; }
+  .modal-dialog { margin: .75rem auto; }
+}
+
+/* phone */
+@media (max-width: 767.98px) {
+  .topbar { height: 58px; }
+  :root { --topbar-h: 58px; }
+  .stat-card { padding: 14px; }
+  .stat-card .value { font-size: 1.3rem; }
+  .stat-card .icon-box { width: 38px; height: 38px; font-size: 0.98rem; border-radius: 11px; margin-bottom: 10px; }
+  .stat-card .label { font-size: .64rem; }
+  .stat-card .trend { font-size: .68rem; padding: 4px 8px; }
+  .stat-card .sub { font-size: .72rem; }
+  .table-saas td, .table-saas th { padding: 9px 10px; font-size: .8rem; }
+  .page-title { font-size: 1.16rem; gap: 7px; }
+  .page-subtitle { font-size: .8rem; }
+  .content { padding: 13px 10px; }
+  .empty-state { padding: 28px 14px; }
+  .file-drop { padding: 18px; }
+  .modal-content { border-radius: 16px; }
+  .chart-wrap { height: 200px; }
+  .chart-wrap.sm { height: 150px; }
+  .quiz-offline-banner { font-size: .78rem; padding: 10px 12px; }
+  .sidebar-footer { padding: 12px; }
+  #searchResults .row { row-gap: 10px; }
+  .toast-saas { padding: 11px 12px; }
+  .d-flex.gap-2 > .btn { flex: 1 1 auto; }
+}
+
+/* small phone */
+@media (max-width: 479.98px) {
+  .semester-tabs button { padding: 6px 12px; font-size: .78rem; }
+  .topbar-actions { gap: 3px; }
+  .hero-greeting { padding: 18px; }
+  .hero-greeting h2 { font-size: 1.28rem !important; }
+  .sidebar-brand { padding: 0 14px; }
+  .b-title { font-size: .9rem; }
+  #toastContainer { left: 8px !important; right: 8px !important; width: auto !important; }
+  .btn-sm { --bs-btn-padding-y: .3rem; --bs-btn-padding-x: .6rem; }
+  .table-saas td, .table-saas th { padding: 8px 8px; font-size: .76rem; }
+}
+
+/* touch friendliness */
+@media (hover: none) {
+  .card-saas:hover, .stat-card:hover, .subject-card:hover { transform: none; }
+  .sidebar .nav-link, .semester-tabs button, .btn { min-height: 40px; }
+  .topbar-search { display: none !important; }
+}

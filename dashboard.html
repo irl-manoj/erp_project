@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teacher Dashboard - MCA Academic Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link href="../css/style.css" rel="stylesheet">
+<link href="../css/dashboard.css" rel="stylesheet">
+<link href="../css/responsive.css" rel="stylesheet">
+<script>window.ROLE='teacher';</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23c8102e%27/%3E%3Cpath d=%27M18 46V20l14 16 14-16v26%27 stroke=%27white%27 stroke-width=%276%27 fill=%27none%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo" style="background:linear-gradient(135deg,#9f1239,#c8102e);">BIT</div>
+      <div><div class="b-title">BIT Mesra - MCA Dashboard</div><div class="b-sub">Teacher • BIT Mesra</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Teaching</div>
+      <button class="nav-link active" data-view="dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</button>
+      <button class="nav-link" data-view="teacher-subjects"><i class="fa-solid fa-book"></i>Subjects</button>
+      <button class="nav-link" data-view="teacher-students"><i class="fa-solid fa-user-group"></i>Students</button>
+      <button class="nav-link" data-view="teacher-quizzes"><i class="fa-solid fa-pen-to-square"></i>Quizzes &amp; End-Sem</button>
+      <button class="nav-link" data-view="teacher-internal"><i class="fa-solid fa-list-check"></i>Internal Config</button>
+      <button class="nav-link" data-view="teacher-attendance"><i class="fa-solid fa-clipboard-check"></i>Attendance</button>
+      <button class="nav-link" data-view="teacher-assignments"><i class="fa-solid fa-file-pen"></i>Assignments</button>
+      <button class="nav-link" data-view="teacher-submissions"><i class="fa-solid fa-inbox"></i>Submissions</button>
+
+      <div class="nav-section-title">System</div>
+      <button class="nav-link" data-view="notices"><i class="fa-solid fa-bullhorn"></i>Notices</button>
+      <button class="nav-link" data-view="notes"><i class="fa-solid fa-file-lines"></i>Notes</button>
+      <button class="nav-link" data-view="syllabus"><i class="fa-solid fa-layer-group"></i>Syllabus</button>
+      <a class="nav-link" href="../index.html"><i class="fa-solid fa-house"></i>Landing Page</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-mini">
+        <div class="avatar" style="background:#fce7f3;color:#9d174d;">RK</div>
+        <div>
+          <div class="name">Prof. Rajesh Kumar</div>
+          <div class="role">Computer Applications • Teacher</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="btn btn-ghost btn-sm mobile-toggle" id="mobileToggle"><i class="fa-solid fa-bars"></i></button>
+      <div class="d-none d-md-block">
+        <div class="fw-bold" style="letter-spacing:-0.02em;">MCA Academic Dashboard</div>
+        <div class="small text-muted" style="margin-top:-4px;">BIT Mesra • Teacher Workspace • Per-student Management</div>
+      </div>
+      <div class="topbar-search d-none d-md-flex">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input id="globalSearch" placeholder="Search students, subjects, assignments…">
+        <button class="btn btn-primary-saas search-go" id="searchBtn"><i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+      <div class="topbar-actions">
+        <div class="d-flex d-md-none">
+          <button class="btn btn-ghost btn-sm" data-bs-toggle="collapse" data-bs-target="#mobileSearch"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+        <button class="btn btn-ghost btn-sm position-relative" id="notifBtn" data-bs-toggle="dropdown">
+          <i class="fa-regular fa-bell"></i>
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.6rem;" id="notifBadge">3</span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-0 overflow-hidden" style="width:320px;max-height:380px;overflow:auto;">
+          <div class="p-3 border-bottom d-flex justify-content-between"><span class="fw-bold small">Notifications</span><span class="small text-muted">/notifications</span></div>
+          <div id="notifDropdown"><div class="p-3 small text-muted">Loading...</div></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="themeToggle"><i class="fa-solid fa-moon" id="themeIcon"></i></button>
+        <div class="d-none d-md-flex align-items-center gap-2 ms-2 ps-2" style="border-left:1px solid var(--border);">
+          <div class="avatar" style="width:34px;height:34px;border-radius:50%;background:#9f1239;color:#fff;display:grid;place-items:center;font-weight:700;font-size:0.8rem;">RK</div>
+          <div class="d-none d-lg-block" style="line-height:1.1;">
+            <div class="small fw-semibold" id="headerUserName">Prof. Rajesh Kumar</div>
+            <div class="small text-muted" style="font-size:0.72rem;" id="headerUserRole">Teacher • Computer Applications</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="collapse d-md-none px-3 py-2 border-bottom" style="background:var(--card);" id="mobileSearch">
+      <div class="position-relative">
+        <input id="globalSearchMobile" class="form-control form-control-saas ps-5" placeholder="Search...">
+        <i class="fa-solid fa-magnifying-glass position-absolute" style="left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);"></i>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="searchResults" class="d-none"></div>
+
+      <!-- Teacher Dashboard -->
+      <div class="view-section" data-view="dashboard">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div>
+            <h4 class="page-title mb-0">Faculty Dashboard</h4>
+            <div class="page-subtitle">Your students' records - attendance, quiz marks, internals, assignments - you manage, you don't attempt</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary-saas" data-bs-toggle="modal" data-bs-target="#addSubjectModal"><i class="fa-solid fa-plus me-2"></i>Add Subject</button>
+            <button class="btn btn-ghost" data-bs-toggle="modal" data-bs-target="#addAssignmentModal"><i class="fa-solid fa-file-pen me-2"></i>Create Assignment</button>
+          </div>
+        </div>
+        <div id="dashboardContent"></div>
+      </div>
+
+      <div class="view-section d-none" data-view="teacher-subjects">
+        <h4 class="page-title">Subject Management</h4>
+        <div class="page-subtitle mb-3">Add • Edit • Delete • Set Credits • Semester • Type (Theory/Lab/Elective) • API: /subjects</div>
+        <div id="teacherSubjectsView"></div>
+      </div>
+      <div class="view-section d-none" data-view="teacher-students">
+        <h4 class="page-title">Students</h4>
+        <div class="page-subtitle mb-3">View students per subject • Check attendance, quiz, internal, end-sem, final marks</div>
+        <div id="teacherStudentsView"></div>
+      </div>
+      <div class="view-section d-none" data-view="teacher-quizzes">
+        <h4 class="page-title"><i class="fa-solid fa-pen-to-square me-2" style="color:var(--primary)"></i>Marks Entry - Quizzes &amp; End-Semester</h4>
+        <div class="page-subtitle mb-3">Quizzes: 3 offline tests ×15 → auto Best 2 = 30 • Internals = 20 • End-Sem out of 50 - enter below each subject card • Total = 100 • PUT /assessments + /endsem</div>
+        <div id="teacherQuizzesView"></div>
+      </div>
+      <div class="view-section d-none" data-view="teacher-internal">
+        <h4 class="page-title">Internal Marks Configuration</h4>
+        <div class="page-subtitle mb-3">Configurable components • Must sum to 20 • E.g., Assignment 5 + Presentation 5 + Class Test 10</div>
+        <div id="teacherInternalView"></div>
+      </div>
+      <div class="view-section d-none" data-view="teacher-attendance">
+        <h4 class="page-title">Attendance Management</h4>
+        <div class="page-subtitle mb-3">Update Total / Attended • Auto % • 75% indicator • PUT /attendance/:id</div>
+        <div id="teacherAttendanceView"></div>
+      </div>
+      <div class="view-section d-none" data-view="teacher-assignments">
+        <h4 class="page-title">Assignment Management</h4>
+        <div class="page-subtitle mb-3">Create • Attach file • Description • Deadline • Max marks • View submissions • POST /assignments</div>
+        <div id="teacherAssignmentsView"></div>
+      </div>
+      <div class="view-section d-none" data-view="teacher-submissions">
+        <h4 class="page-title">Submissions & Evaluation</h4>
+        <div class="page-subtitle mb-3">Download • Give marks • Feedback • Statuses: Not Started / Submitted / Late / Checked / Returned</div>
+        <div id="teacherSubmissionsView"></div>
+      </div>
+
+      <!-- Reuse student views for teacher preview -->
+      <div class="view-section d-none" data-view="subject-details"><div id="subjectDetailsView"></div></div>
+      <div class="view-section d-none" data-view="notices"><h4 class="page-title">Notices</h4><div id="noticesView"></div></div>
+      <div class="view-section d-none" data-view="notes"><h4 class="page-title">Notes</h4><div id="notesView"></div></div>
+      <div class="view-section d-none" data-view="syllabus"><h4 class="page-title">Syllabus</h4><div id="syllabusView"></div></div>
+    </div>
+
+    <footer class="mt-auto p-3 text-center small text-muted border-top" style="background:var(--card);">BIT Mesra • Teacher Workspace • Edits persist per student via localStorage • Per-student attendance & marks</footer>
+  </div>
+</div>
+
+<div id="toastContainer" style="position:fixed; top:16px; right:16px; z-index:1080; width:360px; max-width:92vw;"></div>
+
+<!-- Add Subject Modal -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="addSubjectForm">
+      <div class="modal-header"><h6 class="modal-title"><i class="fa-solid fa-book me-2 text-primary"></i>Add Subject</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12"><label class="small fw-semibold">Subject Name</label><input name="name" class="form-control form-control-saas" placeholder="Database Management System" required></div>
+          <div class="col-6"><label class="small fw-semibold">Subject Code</label><input name="code" class="form-control form-control-saas" placeholder="MCA-DBMS" required></div>
+          <div class="col-6"><label class="small fw-semibold">Faculty Name</label><input name="faculty" class="form-control form-control-saas" placeholder="Prof. Rajesh Kumar" required></div>
+          <div class="col-4"><label class="small fw-semibold">Semester</label><select name="semester" class="form-select form-select-saas"><option value="1">Sem 1</option><option value="2">Sem 2</option><option value="3">Sem 3</option><option value="4">Sem 4</option></select></div>
+          <div class="col-4"><label class="small fw-semibold">Credits</label><input name="credits" type="number" min="1" max="10" class="form-control form-control-saas" value="4" required><div class="small text-muted">>0 required</div></div>
+          <div class="col-4"><label class="small fw-semibold">Subject Type</label><select name="type" class="form-select form-select-saas"><option value="theory">Theory</option><option value="lab">Lab / Practical</option><option value="elective">Elective</option></select></div>
+        </div>
+        <div class="alert small mt-3 mb-0" style="background:#fff1f2;border:1px solid #fbcfe0;color:#881337;"><i class="fa-solid fa-circle-info me-1"></i>Credits required for SGPA/CGPA • Lab allows configurable assessment components.</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-ghost" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-primary-saas" type="submit"><i class="fa-solid fa-plus me-1"></i>Create Subject</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Assignment Modal -->
+<div class="modal fade" id="addAssignmentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="addAssignmentForm">
+      <div class="modal-header"><h6 class="modal-title"><i class="fa-solid fa-file-pen me-2 text-primary"></i>Create Assignment</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="small fw-semibold">Subject</label>
+        <select name="subjectId" class="form-select form-select-saas mb-2"><option value="1">MCA-DBMS • Database Management System</option><option value="2">MCA-DSA • Data Structures</option><option value="3">MCA-JAVA • Java Programming</option><option value="5">MCA-DBMS-LAB • DBMS Lab</option></select>
+        <label class="small fw-semibold">Title</label><input name="title" class="form-control form-control-saas mb-2" placeholder="Assignment title" required>
+        <label class="small fw-semibold">Description</label><textarea name="description" class="form-control form-control-saas mb-2" rows="2" placeholder="Instructions..."></textarea>
+        <div class="row g-2"><div class="col-6"><label class="small fw-semibold">Max Marks</label><input name="maxMarks" type="number" class="form-control form-control-saas" value="20" required></div><div class="col-6"><label class="small fw-semibold">Deadline</label><input name="deadline" type="date" class="form-control form-control-saas" required></div></div>
+        <div class="file-drop mt-3" onclick="toast('File attach via API - POST /assignments with fileUrl','info')"><i class="fa-solid fa-paperclip"></i> Attach File (PDF/DOC) • Via API</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-ghost" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-primary-saas" type="submit">Create</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Grade Modal -->
+<div class="modal fade" id="gradeModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <form class="modal-content" id="gradeForm">
+      <div class="modal-header"><h6 class="modal-title">Grade Submission</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="gradeSubmissionId">
+        <label class="small fw-semibold">Marks</label><input id="gradeMarks" type="number" class="form-control form-control-saas mb-2" min="0" required>
+        <label class="small fw-semibold">Feedback</label><textarea id="gradeFeedback" class="form-control form-control-saas" rows="2" placeholder="Good work..."></textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary-saas w-100" type="submit">Save Grade</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Attendance Modal -->
+<div class="modal fade" id="attendanceModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <form class="modal-content" id="attendanceForm">
+      <div class="modal-header"><h6 class="modal-title">Update Attendance</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="attSubjectId">
+        <label class="small fw-semibold">Total Classes</label><input id="attTotal" type="number" class="form-control form-control-saas mb-2" value="40" min="0" required>
+        <label class="small fw-semibold">Attended</label><input id="attAttended" type="number" class="form-control form-control-saas" value="34" min="0" required>
+        <div class="small text-muted mt-2">Validated: Attended ≤ Total</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary-saas w-100" type="submit">Save</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Also need subject details target -->
+<div class="modal fade" id="submitModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" id="submitForm">
+      <div class="modal-header"><h6 class="modal-title">Submit (teacher preview)</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="submitAssignmentId">
+        <div id="submitAssignmentTitle" class="small fw-bold"></div>
+        <input type="file" id="submitFile" class="form-control mt-2">
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary-saas" type="submit">Submit</button></div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/calculations.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/charts.js"></script>
+<script src="../js/app.js"></script>
+  <footer class="legal-strip"><span>MCA Academic Dashboard &copy; 2024, Department of Computer Applications, BIT Mesra (demo project).</span><span class="ms-auto"><a href="../privacy.html" rel="noopener">Privacy Policy</a> &middot; <a href="../terms.html" rel="noopener">Terms</a></span></footer>
+</body></html>
