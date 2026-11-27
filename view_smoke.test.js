@@ -13,7 +13,9 @@ test('both dashboard roles and their view containers are present', () => {
   assert.match(html, /data-teacher-only/);
   assert.match(html, /id="submitFile"[^>]*multiple/);
   assert.match(html, /name="files"[^>]*multiple/);
-  for (const view of ['dashboard','subjects','attendance','quiz','internal','assignments','sgpa','progress','exams','profile','teacher-subjects','teacher-attendance','teacher-submissions']) {
+  assert.match(html, /id="timetableForm"/);
+  assert.match(html, /data-view="timetable"/);
+  for (const view of ['dashboard','subjects','attendance','timetable','fees','quiz','internal','assignments','sgpa','progress','exams','profile','teacher-subjects','teacher-attendance','teacher-submissions']) {
     assert.match(html, new RegExp(`data-view="${view}"`));
   }
 });
@@ -24,7 +26,7 @@ test('browser loads real API client and verifies the server session before dashb
   const app = read('app.js');
   const login = read('login.html');
   const registration = read('register.html');
-  assert.match(html, /src="js\/api\.js\?v=loginfix5"/);
+  assert.match(html, /src="js\/api\.js\?v=timetable-management1"/);
   assert.match(client, /fetch\(/);
   assert.match(client, /\/auth\/login/);
   assert.match(client, /\/auth\/me/);
@@ -33,6 +35,17 @@ test('browser loads real API client and verifies the server session before dashb
   assert.match(login, /href="register\.html"/);
   assert.match(registration, /API\.register\(payload\)/);
   assert.match(client, /\/auth\/register/);
+  assert.match(client, /getAttendanceSessions/);
+  assert.match(client, /getTimetable/);
+  assert.match(client, /createTimetable/);
+  assert.match(client, /updateTimetable/);
+  assert.match(client, /deleteTimetable/);
+  assert.match(client, /payDemoFee/);
+  assert.match(app, /Weekly timetable/);
+  assert.match(app, /API\.getTimetable\(\)\.then\(items=>\(\{items,error:null\}\)\)\.catch\(error=>\(\{items:\[\],error\}\)\)/);
+  assert.match(app, /Attend the next/);
+  assert.match(app, /Daily attendance history/);
+  assert.match(app, /Demo billing only/);
   assert.match(app, /await API\.getMe\(\)/);
 });
 

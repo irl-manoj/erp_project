@@ -1,6 +1,6 @@
 # MCA Academic Management Dashboard
 
-A responsive student/teacher academic portal backed by an Express API and a persistent SQLite database. It includes authenticated role-specific login, per-student academic data, teacher mark/attendance updates, assignment submissions, and server-side validation.
+A responsive student/teacher academic portal backed by an Express API and a persistent SQLite database. It includes authenticated role-specific login, per-student academic data, a weekly timetable, date-by-date attendance with a 75% projection, demo-only fee invoices and receipts, teacher mark/attendance workflows, assignment submissions, and server-side validation.
 
 ## Run locally
 
@@ -33,8 +33,11 @@ The demo password is only for the included sample accounts. The login page links
 
 - **Authentication:** email/roll + password, role-bound login, 12-hour signed session in an HttpOnly cookie, a short-lived bearer-token fallback for embedded preview browsers, logout, and login rate limiting.
 - **Authorization:** students can read only their own profile, attendance, marks, and submissions. Teacher access is scoped server-side to subjects assigned to that teacher; teachers cannot read or edit another teacher’s subject marks, assignments, or submissions. A teacher may see student profiles only for semesters in which they teach. Changing client IDs or roles does not bypass these checks.
-- **Persisted records:** students/teachers, subjects, attendance, quizzes, internal and end-semester marks, lab marks, assignments, submissions, exams, notes, notices, syllabus and notifications are stored in SQLite.
-- **Teacher actions:** create/update/delete subjects; edit attendance and assessment marks; create assignments; review and grade submissions.
+- **Persisted records:** students/teachers, subjects, timetable, aggregate and dated attendance, demo fee invoices/payments, quizzes, internal and end-semester marks, lab marks, assignments, submissions, exams, notes, notices, syllabus and notifications are stored in SQLite.
+- **Timetable:** teachers can add, edit, and remove schedule entries for their own subjects; the server validates ownership, class times, and teacher/room conflicts. Students see saved entries on their dashboard and full timetable page, including day, time, room, subject, and teacher email. Seeded rows are demo data and should be checked against the official department schedule.
+- **Attendance:** students can review each dated Present/Absent class record and subject-level projections for the 75% target (additional classes to attend, or future classes they can miss while remaining at target). Teachers can record attendance by date for scheduled classes; the server validates subject ownership, student enrollment, date, and schedule.
+- **Fees and receipts:** sample invoices can be marked paid in the demo ledger and produce downloadable HTML receipts. This is explicitly a **demo-only action**: it does not connect to a payment processor, charge money, or create an official institutional receipt. Sample amounts are not official fee notices. `DEMO_SEMESTER_FEE_INR` optionally changes the sample amount (default `50000`).
+- **Teacher actions:** create/update/delete subjects; record dated attendance and assessment marks; create assignments; review and grade submissions.
 - **Student actions:** view their academic dashboard and upload up to 10 assignment-submission files per submission. Each file can be up to 15 MB and is saved in `uploads/submissions/`; downloads are limited to the owning student or a teacher.
 - **Assignment materials:** teachers can attach up to 10 files to an assignment. Files are saved in `uploads/assignments/` and students can download each attachment through an authenticated route. Accepted types are PDF, DOC/DOCX, PPT/PPTX, XLS/XLSX, TXT, ZIP, PNG, and JPEG.
 - **Validation:** mark ranges, internal component totals, attendance totals, uploads and authorization are checked on the server, not just in the browser.

@@ -29,14 +29,15 @@ The browser stores a small user display cache and a short-lived session fallback
 ### Student
 
 - Sign in with an email address or roll number and a password.
-- View the signed-in student's profile, subjects, attendance, quizzes, internal marks, end-semester marks, lab marks, assignments, exams, notices, notes, syllabus, and progress.
+- View the signed-in student's profile, subjects, the teacher-published weekly timetable on the dashboard and full timetable page (teacher email, time, and room), attendance history by date and subject-level 75% projection, fee invoices and demo receipts, quizzes, internal marks, end-semester marks, lab marks, assignments, exams, notices, notes, syllabus, and progress.
+- Mark sample fee invoices as paid in the demo ledger and download an HTML receipt. This action never charges money and is not an official payment or receipt.
 - Upload up to 10 files to an assignment submission. Files are checked by type and size, stored on the server, and can be downloaded by the student who submitted them or a teacher.
 
 ### Teacher
 
 - Register with a private invitation code or sign in to the teacher portal.
 - View student profiles for semesters in which the teacher has assigned subjects.
-- Create and manage only their own subjects; update attendance and marks for those subjects; create assignments; review and grade submissions for those assignments.
+- Create and manage only their own subjects; add, edit, or remove their subjects' weekly timetable entries; record present/absent attendance for a scheduled class date and enrolled student; update marks; create assignments; review and grade submissions for those assignments.
 - Teacher ownership is enforced by server-side checks, including API reads, edits, deletes, and downloads.
 
 ## Academic rules

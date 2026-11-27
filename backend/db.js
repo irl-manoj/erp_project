@@ -37,10 +37,15 @@ db.exec(`
 `);
 try { db.exec('ALTER TABLE records ADD COLUMN teacher_id INTEGER'); } catch (error) { if (!/duplicate column/i.test(error.message)) throw error; }
 db.exec('CREATE INDEX IF NOT EXISTS idx_records_teacher ON records(collection, teacher_id)');
+db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
 
 const recordCollections = {
   subjects: MockDB.subjects,
+  timetable: MockDB.timetable,
   attendance: MockDB.attendance,
+  attendanceSessions: MockDB.attendanceSessions,
+  fees: MockDB.fees,
+  feePayments: MockDB.feePayments,
   quizzes: MockDB.quizzes,
   internals: MockDB.internals,
   endSems: MockDB.endSems,
@@ -53,6 +58,9 @@ const recordCollections = {
   syllabus: MockDB.syllabus,
   notifications: MockDB.notifications
 };
+const requestedDemoFee = Math.floor(Number(process.env.DEMO_SEMESTER_FEE_INR));
+const configuredDemoFee = Number.isSafeInteger(requestedDemoFee) && requestedDemoFee > 0 ? requestedDemoFee : 50000;
+for (const invoice of recordCollections.fees) invoice.amountInr = configuredDemoFee;
 const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
 if (count === 0) {
   const demoPassword = process.env.DEMO_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : '1234');
@@ -131,6 +139,44 @@ for (const collection of Object.keys(recordCollections)) {
       setTeacherOwner.run(teacherId, collection, key);
     }
   }
+}
+
+const featureMigration = 'weekly-timetable-attendance-fees-v1';
+if (!db.prepare('SELECT 1 FROM schema_migrations WHERE migration_key=?').get(featureMigration)) {
+  const migrateFeatures = db.transaction(() => {
+    for (const collection of ['timetable','fees','feePayments']) {
+      for (const item of recordCollections[collection]) {
+        const owner = item.subjectId == null ? null : subjectOwners.get(String(item.subjectId)) ?? null;
+        upsertRecord(collection, item, item.id, owner);
+      }
+    }
+    if (!listRecords('attendanceSessions').length) {
+      const dayIndex = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+      const sessionsBySubject = new Map();
+      for (const session of listRecords('timetable')) {
+        if (!sessionsBySubject.has(String(session.subjectId))) sessionsBySubject.set(String(session.subjectId), new Set());
+        sessionsBySubject.get(String(session.subjectId)).add(dayIndex[session.day]);
+      }
+      for (const summary of listRecords('attendance')) {
+        const classDays = sessionsBySubject.get(String(summary.subjectId)) || new Set();
+        const dates = [];
+        const cursor = new Date(Date.UTC(2026, 10, 27, 12));
+        for (let step = 0; step < 1200 && dates.length < Number(summary.totalClasses || 0); step++) {
+          if (classDays.has(cursor.getUTCDay())) dates.push(cursor.toISOString().slice(0, 10));
+          cursor.setUTCDate(cursor.getUTCDate() - 1);
+        }
+        dates.reverse();
+        const total = dates.length;
+        const attended = Math.min(total, Math.max(0, Number(summary.attendedClasses) || 0));
+        dates.forEach((date, index) => {
+          const session = { id: `${summary.subjectId}-${summary.studentId}-${date}`, subjectId: summary.subjectId, studentId: summary.studentId, date, status: Math.floor((index + 1) * attended / total) > Math.floor(index * attended / total) ? 'present' : 'absent' };
+          upsertRecord('attendanceSessions', session, session.id, subjectOwners.get(String(summary.subjectId)) ?? null);
+        });
+      }
+    }
+    db.prepare('INSERT INTO schema_migrations(migration_key,applied_at) VALUES(?,?)').run(featureMigration, new Date().toISOString());
+  });
+  migrateFeatures();
 }
 
 module.exports = { db, recordCollections, listUsers, findUserById, listRecords, recordTeacherId, upsertRecord, deleteRecord, findRecord, safeUser };

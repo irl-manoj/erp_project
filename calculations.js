@@ -21,6 +21,21 @@ function getAttendanceStatus(percentage) {
     };
 }
 
+// Future class projection for a minimum attendance threshold.
+function getAttendanceProjection(attended, total, required = 75) {
+    const a = Math.max(0, Math.floor(Number(attended) || 0));
+    const t = Math.max(0, Math.floor(Number(total) || 0));
+    const threshold = Number(required);
+    if (!Number.isFinite(threshold) || threshold <= 0 || threshold >= 100) throw new RangeError('Attendance threshold must be between 0 and 100.');
+    const percentage = t ? (a / t) * 100 : 0;
+    if (percentage >= threshold) {
+        const classesCanSkip = Math.max(0, Math.floor((a * 100 / threshold) - t + 1e-9));
+        return { percentage, met: true, classesToAttend: 0, classesCanSkip };
+    }
+    const classesToAttend = Math.max(1, Math.ceil(((threshold * t / 100) - a) / (1 - threshold / 100) - 1e-9));
+    return { percentage, met: false, classesToAttend, classesCanSkip: 0 };
+}
+
 // Best 2 of 3 quizzes - excludes lowest
 function calculateBestTwoQuizzes(quizzes) {
     if (!quizzes || quizzes.length === 0) return { best: [], countedMarks: 0, maxMarks: 0, percentage: 0, excluded: [] };
@@ -142,7 +157,7 @@ const Validators = {
 // Export for Node / browser
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        calculateAttendance, getAttendanceStatus, calculateBestTwoQuizzes,
+        calculateAttendance, getAttendanceStatus, getAttendanceProjection, calculateBestTwoQuizzes,
         calculateTheoryTotal, calculateTheoryPercentage, calculateInternalTotal,
         calculateInternalMax, validateInternalTotal, calculateLabTotal,
         getGradePoint, calculateSGPA, calculateCGPA, calculateOverallAttendance,
