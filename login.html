@@ -123,6 +123,8 @@
     btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Logging in...';
     try{
       const user = await API.authenticate(document.getElementById('identifier').value, role, document.getElementById('password').value);
+      const verifiedUser = await API.getMe();
+      if (verifiedUser.id !== user.id || verifiedUser.role !== user.role) throw new Error('The session could not be verified. Please try again.');
       window.location.href = 'dashboard.html?role=' + user.role;
     }catch(e){ showErr(e.message || 'Login failed'); }
     finally{ btn.disabled = false; btn.innerHTML = orig; }

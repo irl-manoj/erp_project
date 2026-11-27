@@ -3,6 +3,20 @@
   'use strict';
   const API_BASE = (window.CONFIG && window.CONFIG.API_BASE_URL) || '/api';
   const USER_KEY = 'mca_current_user';
+  const TOKEN_KEY = 'mca_access_token';
+
+  function sessionHeaders() {
+    const headers = new Headers();
+    try {
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+    } catch {}
+    return headers;
+  }
+  function clearSession() {
+    try { localStorage.removeItem(USER_KEY); } catch {}
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch {}
+  }
 
   function queryString(filters = {}) {
     const params = new URLSearchParams();
@@ -13,15 +27,16 @@
     return query ? `?${query}` : '';
   }
   async function request(path, options = {}) {
-    const headers = new Headers(options.headers || {});
+    const headers = new Headers(sessionHeaders());
+    new Headers(options.headers || {}).forEach((value, key) => headers.set(key, value));
     if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     const response = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'same-origin' });
     const contentType = response.headers.get('content-type') || '';
     const body = contentType.includes('application/json') ? await response.json() : null;
     if (!response.ok) {
       const error = { status: response.status, message: body?.message || `Request failed (${response.status})` };
-      if (response.status === 401 && !location.pathname.endsWith('index.html') && !location.pathname.endsWith('login.html')) {
-        try { localStorage.removeItem(USER_KEY); } catch {}
+      if (response.status === 401 && (path === '/auth/login' || (!location.pathname.endsWith('index.html') && !location.pathname.endsWith('login.html')))) {
+        clearSession();
       }
       throw error;
     }
@@ -35,6 +50,7 @@
     authenticate: async (identifier, role, password) => {
       const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ identifier, role, password }) });
       try { localStorage.setItem(USER_KEY, JSON.stringify(result.user)); } catch {}
+      try { sessionStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
       return result.user;
     },
     login: async (userId) => {
@@ -48,7 +64,7 @@
       return result.user;
     },
     logout: async () => {
-      try { await request('/auth/logout', { method: 'POST' }); } finally { try { localStorage.removeItem(USER_KEY); } catch {} }
+      try { await request('/auth/logout', { method: 'POST' }); } finally { clearSession(); }
       return { success: true };
     },
     getStudent: id => request(`/students/${encodeURIComponent(id)}`),
@@ -91,7 +107,7 @@
     updateAssignment: (id, payload) => put('assignments', id, payload),
     deleteAssignment: id => request(`/assignments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     downloadAssignment: async (id, index = 0, fileName = '') => {
-      const response = await fetch(`${API_BASE}/assignments/${encodeURIComponent(id)}/files/${encodeURIComponent(index)}`, { credentials: 'same-origin' });
+      const response = await fetch(`${API_BASE}/assignments/${encodeURIComponent(id)}/files/${encodeURIComponent(index)}`, { credentials: 'same-origin', headers: sessionHeaders() });
       if (!response.ok) throw { status: response.status, message: 'No assignment file is attached or download is unavailable.' };
       const blob = await response.blob();
       const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = fileName || '';
@@ -110,7 +126,7 @@
     },
     gradeSubmission: (id, marks, feedback) => put('submissions', id, { marks, feedback }),
     downloadSubmission: async (id, index = 0, fileName = '') => {
-      const response = await fetch(`${API_BASE}/submissions/${encodeURIComponent(id)}/files/${encodeURIComponent(index)}`, { credentials: 'same-origin' });
+      const response = await fetch(`${API_BASE}/submissions/${encodeURIComponent(id)}/files/${encodeURIComponent(index)}`, { credentials: 'same-origin', headers: sessionHeaders() });
       if (!response.ok) throw { status: response.status, message: 'Could not download this submission.' };
       const blob = await response.blob();
       const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = fileName || '';

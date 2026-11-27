@@ -55,6 +55,10 @@ test('student and teacher passwords are verified and role-bound', async () => {
   assert.equal(student.response.status, 200);
   assert.equal(student.data.user.role, 'student');
   assert.ok(student.cookie);
+  assert.ok(student.data.accessToken);
+  const bearerOnly = await fetch(`${base}/api/auth/me`, { headers: { authorization: `Bearer ${student.data.accessToken}` } });
+  assert.equal(bearerOnly.status, 200);
+  assert.equal((await bearerOnly.json()).user.id, 101);
   const teacher = await login('rajesh.kumar@bitmesra.ac.in', 'teacher');
   assert.equal(teacher.response.status, 200);
   assert.equal(teacher.data.user.role, 'teacher');

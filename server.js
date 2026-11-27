@@ -19,6 +19,7 @@ const app = express();
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, 'uploads'));
 fs.mkdirSync(uploadDir, { recursive: true });
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' }, contentSecurityPolicy: false }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
@@ -45,8 +46,14 @@ const upload = multer({
 });
 
 function httpError(status, message) { const error = new Error(message); error.status = status; return error; }
+function sessionCookieOptions(req) {
+  const secure = Boolean(req.secure);
+  return { httpOnly: true, secure, sameSite: secure ? 'none' : 'lax', maxAge: 12 * 60 * 60 * 1000, path: '/' };
+}
 function auth(req, _res, next) {
-  const token = req.cookies[COOKIE_NAME];
+  const authorization = req.get('authorization') || '';
+  const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+  const token = req.cookies[COOKIE_NAME] || bearer;
   if (!token) return next(httpError(401, 'Please log in to continue.'));
   try {
     const payload = jwt.verify(token, JWT_SECRET, { issuer: 'mca-academic-dashboard' });
@@ -116,11 +123,11 @@ app.post('/api/auth/login', loginLimiter, (req, res, next) => {
     if (!row) throw httpError(401, 'Email/roll number or password is incorrect.');
     const user = safeUser(row);
     const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '12h', issuer: 'mca-academic-dashboard' });
-    res.cookie(COOKIE_NAME, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 12 * 60 * 60 * 1000, path: '/' });
-    res.json({ user, expiresIn: 43200 });
+    res.cookie(COOKIE_NAME, token, sessionCookieOptions(req));
+    res.json({ user, accessToken: token, expiresIn: 43200 });
   } catch (error) { next(error); }
 });
-app.post('/api/auth/logout', (_req, res) => { res.clearCookie(COOKIE_NAME, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/' }); res.json({ success: true }); });
+app.post('/api/auth/logout', (req, res) => { const options = sessionCookieOptions(req); delete options.maxAge; res.clearCookie(COOKIE_NAME, options); res.json({ success: true }); });
 app.get('/api/auth/me', auth, (req, res) => res.json({ user: req.user }));
 
 app.get('/api/progress', auth, (req, res, next) => {

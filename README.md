@@ -31,14 +31,14 @@ The demo password is only for the included sample accounts. The server stores **
 
 ## What is connected to the backend
 
-- **Authentication:** email/roll + password, role-bound login, 12-hour signed session in an HttpOnly, SameSite cookie, logout, login rate limiting.
+- **Authentication:** email/roll + password, role-bound login, 12-hour signed session in an HttpOnly cookie, a short-lived bearer-token fallback for embedded preview browsers, logout, and login rate limiting.
 - **Authorization:** student accounts can only read their own profile, attendance, marks, and submissions; teacher accounts can see the class roster and make teacher-only changes. The server enforces this even if a client changes IDs or roles.
 - **Persisted records:** students/teachers, subjects, attendance, quizzes, internal and end-semester marks, lab marks, assignments, submissions, exams, notes, notices, syllabus and notifications are stored in SQLite.
 - **Teacher actions:** create/update/delete subjects; edit attendance and assessment marks; create assignments; review and grade submissions.
 - **Student actions:** view their academic dashboard and upload up to 10 assignment-submission files per submission. Each file can be up to 15 MB and is saved in `uploads/submissions/`; downloads are limited to the owning student or a teacher.
 - **Assignment materials:** teachers can attach up to 10 files to an assignment. Files are saved in `uploads/assignments/` and students can download each attachment through an authenticated route. Accepted types are PDF, DOC/DOCX, PPT/PPTX, XLS/XLSX, TXT, ZIP, PNG, and JPEG.
 - **Validation:** mark ranges, internal component totals, attendance totals, uploads and authorization are checked on the server, not just in the browser.
-- **Frontend:** `js/api.js` now calls `/api` rather than using the old mock data layer. `localStorage` holds only the small UI identity cache; academic records live in the SQLite database.
+- **Frontend:** `js/api.js` calls `/api` rather than the old mock data layer. Browser storage holds only the UI identity cache and a short-lived session fallback; academic records live in SQLite.
 
 ## Useful commands
 
