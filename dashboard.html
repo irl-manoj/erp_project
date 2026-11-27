@@ -8,10 +8,10 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<link href="../css/style.css" rel="stylesheet">
-<link href="../css/dashboard.css" rel="stylesheet">
-<link href="../css/responsive.css" rel="stylesheet">
-<script>window.ROLE='teacher';</script>
+<link href="style.css" rel="stylesheet">
+<link href="dashboard.css" rel="stylesheet">
+<link href="responsive.css" rel="stylesheet">
+<script>window.ROLE=new URLSearchParams(location.search).get('role')==='student'?'student':'teacher';</script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23c8102e%27/%3E%3Cpath d=%27M18 46V20l14 16 14-16v26%27 stroke=%27white%27 stroke-width=%276%27 fill=%27none%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 </head>
 <body>
@@ -19,24 +19,35 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo" style="background:linear-gradient(135deg,#9f1239,#c8102e);">BIT</div>
-      <div><div class="b-title">BIT Mesra - MCA Dashboard</div><div class="b-sub">Teacher • BIT Mesra</div></div>
+      <div><div class="b-title">BIT Mesra - MCA Dashboard</div><div class="b-sub">Academic Portal • BIT Mesra</div></div>
     </div>
     <nav class="sidebar-nav">
-      <div class="nav-section-title">Teaching</div>
-      <button class="nav-link active" data-view="dashboard"><i class="fa-solid fa-table-columns"></i>Dashboard</button>
-      <button class="nav-link" data-view="teacher-subjects"><i class="fa-solid fa-book"></i>Subjects</button>
-      <button class="nav-link" data-view="teacher-students"><i class="fa-solid fa-user-group"></i>Students</button>
-      <button class="nav-link" data-view="teacher-quizzes"><i class="fa-solid fa-pen-to-square"></i>Quizzes &amp; End-Sem</button>
-      <button class="nav-link" data-view="teacher-internal"><i class="fa-solid fa-list-check"></i>Internal Config</button>
-      <button class="nav-link" data-view="teacher-attendance"><i class="fa-solid fa-clipboard-check"></i>Attendance</button>
-      <button class="nav-link" data-view="teacher-assignments"><i class="fa-solid fa-file-pen"></i>Assignments</button>
-      <button class="nav-link" data-view="teacher-submissions"><i class="fa-solid fa-inbox"></i>Submissions</button>
+      <div class="nav-section-title" data-student-only>Learning</div>
+      <button class="nav-link active" data-view="dashboard" data-student-only><i class="fa-solid fa-table-columns"></i>Dashboard</button>
+      <button class="nav-link" data-view="subjects" data-student-only><i class="fa-solid fa-book-open"></i>My Subjects</button>
+      <button class="nav-link" data-view="attendance" data-student-only><i class="fa-solid fa-clipboard-check"></i>Attendance</button>
+      <button class="nav-link" data-view="quiz" data-student-only><i class="fa-solid fa-pen-to-square"></i>Quiz &amp; Marks</button>
+      <button class="nav-link" data-view="internal" data-student-only><i class="fa-solid fa-list-check"></i>Internal Marks</button>
+      <button class="nav-link" data-view="assignments" data-student-only><i class="fa-solid fa-file-pen"></i>Assignments</button>
+      <button class="nav-link" data-view="sgpa" data-student-only><i class="fa-solid fa-chart-line"></i>SGPA / CGPA</button>
+      <button class="nav-link" data-view="progress" data-student-only><i class="fa-solid fa-bars-progress"></i>Progress</button>
+      <button class="nav-link" data-view="exams" data-student-only><i class="fa-solid fa-calendar-days"></i>Exams</button>
+      <button class="nav-link" data-view="profile" data-student-only><i class="fa-solid fa-user"></i>Profile</button>
+      <div class="nav-section-title" data-teacher-only>Teaching</div>
+      <button class="nav-link active" data-view="dashboard" data-teacher-only><i class="fa-solid fa-table-columns"></i>Dashboard</button>
+      <button class="nav-link" data-view="teacher-subjects" data-teacher-only><i class="fa-solid fa-book"></i>Subjects</button>
+      <button class="nav-link" data-view="teacher-students" data-teacher-only><i class="fa-solid fa-user-group"></i>Students</button>
+      <button class="nav-link" data-view="teacher-quizzes" data-teacher-only><i class="fa-solid fa-pen-to-square"></i>Quizzes &amp; End-Sem</button>
+      <button class="nav-link" data-view="teacher-internal" data-teacher-only><i class="fa-solid fa-list-check"></i>Internal Config</button>
+      <button class="nav-link" data-view="teacher-attendance" data-teacher-only><i class="fa-solid fa-clipboard-check"></i>Attendance</button>
+      <button class="nav-link" data-view="teacher-assignments" data-teacher-only><i class="fa-solid fa-file-pen"></i>Assignments</button>
+      <button class="nav-link" data-view="teacher-submissions" data-teacher-only><i class="fa-solid fa-inbox"></i>Submissions</button>
 
       <div class="nav-section-title">System</div>
       <button class="nav-link" data-view="notices"><i class="fa-solid fa-bullhorn"></i>Notices</button>
       <button class="nav-link" data-view="notes"><i class="fa-solid fa-file-lines"></i>Notes</button>
       <button class="nav-link" data-view="syllabus"><i class="fa-solid fa-layer-group"></i>Syllabus</button>
-      <a class="nav-link" href="../index.html"><i class="fa-solid fa-house"></i>Landing Page</a>
+      <a class="nav-link" href="index.html"><i class="fa-solid fa-house"></i>Landing Page</a>
     </nav>
     <div class="sidebar-footer">
       <div class="user-mini">
@@ -55,7 +66,7 @@
       <button class="btn btn-ghost btn-sm mobile-toggle" id="mobileToggle"><i class="fa-solid fa-bars"></i></button>
       <div class="d-none d-md-block">
         <div class="fw-bold" style="letter-spacing:-0.02em;">MCA Academic Dashboard</div>
-        <div class="small text-muted" style="margin-top:-4px;">BIT Mesra • Teacher Workspace • Per-student Management</div>
+        <div class="small text-muted" style="margin-top:-4px;">BIT Mesra • Secure Academic Portal • Attendance, marks & assignments</div>
       </div>
       <div class="topbar-search d-none d-md-flex">
         <i class="fa-solid fa-magnifying-glass"></i>
@@ -99,52 +110,63 @@
       <div class="view-section" data-view="dashboard">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <div>
-            <h4 class="page-title mb-0">Faculty Dashboard</h4>
+            <h4 class="page-title mb-0">Academic Dashboard</h4>
             <div class="page-subtitle">Your students' records - attendance, quiz marks, internals, assignments - you manage, you don't attempt</div>
           </div>
           <div class="d-flex gap-2">
-            <button class="btn btn-primary-saas" data-bs-toggle="modal" data-bs-target="#addSubjectModal"><i class="fa-solid fa-plus me-2"></i>Add Subject</button>
-            <button class="btn btn-ghost" data-bs-toggle="modal" data-bs-target="#addAssignmentModal"><i class="fa-solid fa-file-pen me-2"></i>Create Assignment</button>
+            <button class="btn btn-primary-saas" data-teacher-only data-bs-toggle="modal" data-bs-target="#addSubjectModal"><i class="fa-solid fa-plus me-2"></i>Add Subject</button>
+            <button class="btn btn-ghost" data-teacher-only data-bs-toggle="modal" data-bs-target="#addAssignmentModal"><i class="fa-solid fa-file-pen me-2"></i>Create Assignment</button>
           </div>
         </div>
         <div id="dashboardContent"></div>
       </div>
 
-      <div class="view-section d-none" data-view="teacher-subjects">
+      <div class="view-section d-none" data-view="teacher-subjects" data-teacher-only>
         <h4 class="page-title">Subject Management</h4>
         <div class="page-subtitle mb-3">Add • Edit • Delete • Set Credits • Semester • Type (Theory/Lab/Elective) • API: /subjects</div>
         <div id="teacherSubjectsView"></div>
       </div>
-      <div class="view-section d-none" data-view="teacher-students">
+      <div class="view-section d-none" data-view="teacher-students" data-teacher-only>
         <h4 class="page-title">Students</h4>
         <div class="page-subtitle mb-3">View students per subject • Check attendance, quiz, internal, end-sem, final marks</div>
         <div id="teacherStudentsView"></div>
       </div>
-      <div class="view-section d-none" data-view="teacher-quizzes">
+      <div class="view-section d-none" data-view="teacher-quizzes" data-teacher-only>
         <h4 class="page-title"><i class="fa-solid fa-pen-to-square me-2" style="color:var(--primary)"></i>Marks Entry - Quizzes &amp; End-Semester</h4>
         <div class="page-subtitle mb-3">Quizzes: 3 offline tests ×15 → auto Best 2 = 30 • Internals = 20 • End-Sem out of 50 - enter below each subject card • Total = 100 • PUT /assessments + /endsem</div>
         <div id="teacherQuizzesView"></div>
       </div>
-      <div class="view-section d-none" data-view="teacher-internal">
+      <div class="view-section d-none" data-view="teacher-internal" data-teacher-only>
         <h4 class="page-title">Internal Marks Configuration</h4>
         <div class="page-subtitle mb-3">Configurable components • Must sum to 20 • E.g., Assignment 5 + Presentation 5 + Class Test 10</div>
         <div id="teacherInternalView"></div>
       </div>
-      <div class="view-section d-none" data-view="teacher-attendance">
+      <div class="view-section d-none" data-view="teacher-attendance" data-teacher-only>
         <h4 class="page-title">Attendance Management</h4>
         <div class="page-subtitle mb-3">Update Total / Attended • Auto % • 75% indicator • PUT /attendance/:id</div>
         <div id="teacherAttendanceView"></div>
       </div>
-      <div class="view-section d-none" data-view="teacher-assignments">
+      <div class="view-section d-none" data-view="teacher-assignments" data-teacher-only>
         <h4 class="page-title">Assignment Management</h4>
         <div class="page-subtitle mb-3">Create • Attach file • Description • Deadline • Max marks • View submissions • POST /assignments</div>
         <div id="teacherAssignmentsView"></div>
       </div>
-      <div class="view-section d-none" data-view="teacher-submissions">
+      <div class="view-section d-none" data-view="teacher-submissions" data-teacher-only>
         <h4 class="page-title">Submissions & Evaluation</h4>
         <div class="page-subtitle mb-3">Download • Give marks • Feedback • Statuses: Not Started / Submitted / Late / Checked / Returned</div>
         <div id="teacherSubmissionsView"></div>
       </div>
+
+      <!-- Student views use the same server API, scoped to the authenticated student. -->
+      <div class="view-section d-none" data-view="subjects"><h4 class="page-title">My Subjects</h4><div id="subjectsView"></div></div>
+      <div class="view-section d-none" data-view="attendance"><h4 class="page-title">Attendance</h4><div id="attendanceView"></div></div>
+      <div class="view-section d-none" data-view="quiz"><h4 class="page-title">Quiz &amp; Marks</h4><div id="quizView"></div></div>
+      <div class="view-section d-none" data-view="internal"><h4 class="page-title">Internal Marks</h4><div id="internalView"></div></div>
+      <div class="view-section d-none" data-view="assignments"><h4 class="page-title">Assignments</h4><div id="assignmentsView"></div></div>
+      <div class="view-section d-none" data-view="sgpa"><h4 class="page-title">SGPA / CGPA</h4><div id="sgpaView"></div></div>
+      <div class="view-section d-none" data-view="progress"><h4 class="page-title">Progress</h4><div id="progressView"></div></div>
+      <div class="view-section d-none" data-view="exams"><h4 class="page-title">Exams</h4><div id="examsView"></div></div>
+      <div class="view-section d-none" data-view="profile"><h4 class="page-title">My Profile</h4><div id="profileView"></div></div>
 
       <!-- Reuse student views for teacher preview -->
       <div class="view-section d-none" data-view="subject-details"><div id="subjectDetailsView"></div></div>
@@ -153,18 +175,19 @@
       <div class="view-section d-none" data-view="syllabus"><h4 class="page-title">Syllabus</h4><div id="syllabusView"></div></div>
     </div>
 
-    <footer class="mt-auto p-3 text-center small text-muted border-top" style="background:var(--card);">BIT Mesra • Teacher Workspace • Edits persist per student via localStorage • Per-student attendance & marks</footer>
+    <footer class="mt-auto p-3 text-center small text-muted border-top" style="background:var(--card);">BIT Mesra • Academic workspace • Data is saved to the application database</footer>
   </div>
 </div>
 
 <div id="toastContainer" style="position:fixed; top:16px; right:16px; z-index:1080; width:360px; max-width:92vw;"></div>
 
 <!-- Add Subject Modal -->
-<div class="modal fade" id="addSubjectModal" tabindex="-1">
+<div class="modal fade" id="addSubjectModal" data-teacher-only tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" id="addSubjectForm">
-      <div class="modal-header"><h6 class="modal-title"><i class="fa-solid fa-book me-2 text-primary"></i>Add Subject</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h6 class="modal-title" id="subjectModalTitle"><i class="fa-solid fa-book me-2 text-primary"></i>Add Subject</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
+        <input type="hidden" name="id" value="">
         <div class="row g-3">
           <div class="col-12"><label class="small fw-semibold">Subject Name</label><input name="name" class="form-control form-control-saas" placeholder="Database Management System" required></div>
           <div class="col-6"><label class="small fw-semibold">Subject Code</label><input name="code" class="form-control form-control-saas" placeholder="MCA-DBMS" required></div>
@@ -175,13 +198,13 @@
         </div>
         <div class="alert small mt-3 mb-0" style="background:#fff1f2;border:1px solid #fbcfe0;color:#881337;"><i class="fa-solid fa-circle-info me-1"></i>Credits required for SGPA/CGPA • Lab allows configurable assessment components.</div>
       </div>
-      <div class="modal-footer"><button class="btn btn-ghost" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-primary-saas" type="submit"><i class="fa-solid fa-plus me-1"></i>Create Subject</button></div>
+      <div class="modal-footer"><button class="btn btn-ghost" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-primary-saas" id="subjectSubmitButton" type="submit"><i class="fa-solid fa-plus me-1"></i>Create Subject</button></div>
     </form>
   </div>
 </div>
 
 <!-- Add Assignment Modal -->
-<div class="modal fade" id="addAssignmentModal" tabindex="-1">
+<div class="modal fade" id="addAssignmentModal" data-teacher-only tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" id="addAssignmentForm">
       <div class="modal-header"><h6 class="modal-title"><i class="fa-solid fa-file-pen me-2 text-primary"></i>Create Assignment</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -191,7 +214,7 @@
         <label class="small fw-semibold">Title</label><input name="title" class="form-control form-control-saas mb-2" placeholder="Assignment title" required>
         <label class="small fw-semibold">Description</label><textarea name="description" class="form-control form-control-saas mb-2" rows="2" placeholder="Instructions..."></textarea>
         <div class="row g-2"><div class="col-6"><label class="small fw-semibold">Max Marks</label><input name="maxMarks" type="number" class="form-control form-control-saas" value="20" required></div><div class="col-6"><label class="small fw-semibold">Deadline</label><input name="deadline" type="date" class="form-control form-control-saas" required></div></div>
-        <div class="file-drop mt-3" onclick="toast('File attach via API - POST /assignments with fileUrl','info')"><i class="fa-solid fa-paperclip"></i> Attach File (PDF/DOC) • Via API</div>
+        <label class="small fw-semibold mt-3">Attach assignment file (optional)</label><input name="files" type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.png,.jpg,.jpeg" class="form-control form-control-saas"><div class="form-text">Select up to 10 files. Maximum 15 MB per file.</div>
       </div>
       <div class="modal-footer"><button class="btn btn-ghost" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-primary-saas" type="submit">Create</button></div>
     </form>
@@ -199,7 +222,7 @@
 </div>
 
 <!-- Grade Modal -->
-<div class="modal fade" id="gradeModal" tabindex="-1">
+<div class="modal fade" id="gradeModal" data-teacher-only tabindex="-1">
   <div class="modal-dialog modal-sm">
     <form class="modal-content" id="gradeForm">
       <div class="modal-header"><h6 class="modal-title">Grade Submission</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -214,7 +237,7 @@
 </div>
 
 <!-- Attendance Modal -->
-<div class="modal fade" id="attendanceModal" tabindex="-1">
+<div class="modal fade" id="attendanceModal" data-teacher-only tabindex="-1">
   <div class="modal-dialog modal-sm">
     <form class="modal-content" id="attendanceForm">
       <div class="modal-header"><h6 class="modal-title">Update Attendance</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -233,11 +256,11 @@
 <div class="modal fade" id="submitModal" tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" id="submitForm">
-      <div class="modal-header"><h6 class="modal-title">Submit (teacher preview)</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h6 class="modal-title">Submit Assignment</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <input type="hidden" id="submitAssignmentId">
         <div id="submitAssignmentTitle" class="small fw-bold"></div>
-        <input type="file" id="submitFile" class="form-control mt-2">
+        <input type="file" id="submitFile" class="form-control mt-2" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.png,.jpg,.jpeg"><div class="form-text">Select up to 10 files. Maximum 15 MB per file.</div>
       </div>
       <div class="modal-footer"><button class="btn btn-primary-saas" type="submit">Submit</button></div>
     </form>
@@ -245,10 +268,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../js/config.js"></script>
-<script src="../js/calculations.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/charts.js"></script>
-<script src="../js/app.js"></script>
-  <footer class="legal-strip"><span>MCA Academic Dashboard &copy; 2024, Department of Computer Applications, BIT Mesra (demo project).</span><span class="ms-auto"><a href="../privacy.html" rel="noopener">Privacy Policy</a> &middot; <a href="../terms.html" rel="noopener">Terms</a></span></footer>
+<script src="js/config.js"></script>
+<script src="calculations.js"></script>
+<script src="js/api.js"></script>
+<script src="charts.js"></script>
+<script src="app.js"></script>
+  <footer class="legal-strip"><span>MCA Academic Dashboard &copy; 2026, Department of Computer Applications, BIT Mesra (demo project).</span><span class="ms-auto"><a href="privacy.html" rel="noopener">Privacy Policy</a> &middot; <a href="terms.html" rel="noopener">Terms</a></span></footer>
 </body></html>

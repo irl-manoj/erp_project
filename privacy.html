@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy - MCA Academic Dashboard (Demo)</title>
-  <meta name="description" content="Privacy policy for the MCA Academic Dashboard demonstration project (BIT Mesra, MCA). This is a frontend demo with mock data.">
+  <title>Privacy Notice - MCA Academic Dashboard</title>
+  <meta name="description" content="Privacy notice for the MCA Academic Dashboard educational demonstration application.">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23c8102e%27/%3E%3Cpath d=%27M18 46V20l14 16 14-16v26%27 stroke=%27white%27 stroke-width=%276%27 fill=%27none%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="style.css">
   <style>
     body{background:#faf9f9;margin:0}
     .legal-top{background:#7f1023;color:#fff;padding:14px 0}
@@ -33,38 +33,40 @@
   <main class="legal-wrap">
     <div class="legal-card">
       <h1>Privacy Policy</h1>
-      <div class="updated">Applies to: this demonstration website only. Last updated: 27 September 2026.</div>
+      <div class="updated">Applies to this educational demonstration application. Last updated: 27 November 2026.</div>
 
-      <div class="note"><strong>Read this first:</strong> this is an academic student project, not an official BIT Mesra system. It has no backend server. Everything you see is simulated demo data. Do not enter real personal information, passwords you actually use, or official academic records anywhere on this site.</div>
+      <div class="note"><strong>Important:</strong> this is an educational project, not an official BIT Mesra service. It includes a real Express API, SQLite database, and local file uploads, but its bundled accounts and academic records are demonstration data. Do not upload confidential or official student records to an unapproved deployment.</div>
 
-      <h2>1. What this site is</h2>
-      <p>The MCA Academic Dashboard is a frontend-only demonstration of a student/faculty academic portal (attendance, quiz marks, internals, end-semester marks, assignments, SGPA/CGPA). All names, roll numbers, marks, attendance figures and notices are fictitious data created for the demo. Any resemblance to real persons is coincidental.</p>
+      <h2>1. What this application is</h2>
+      <p>The MCA Academic Dashboard demonstrates student and teacher workflows for attendance, assessment marks, assignments, submissions, and academic progress. The bundled accounts and sample records are for testing. A department must approve any real deployment and data processing before use.</p>
 
-      <h2>2. Data collected: none</h2>
-      <p>This site does not operate a server that receives or stores your data. There is no sign-up, no tracking script, no analytics, no advertising network, and no email collection. Login accepts any input by design so that the demo can show role switching; nothing you type at login is transmitted anywhere.</p>
-
-      <h2>3. Data stored in your browser</h2>
-      <p>To demonstrate persistence (for example, a teacher entry appearing on the student view after reload), the demo saves two keys in your browser's <code>localStorage</code>:</p>
+      <h2>2. Information processed by the application</h2>
       <ul>
-        <li><code>mca_current_user</code> - which demo profile is signed in (name, role, roll number from the mock data set)</li>
-        <li><code>mca_db_v2</code> - the simulated records you edited during the demo (attendance, marks, assignments)</li>
+        <li>Login identifiers and passwords are sent to the same-origin API for verification. Passwords are stored as bcrypt hashes, not plaintext.</li>
+        <li>Authenticated profile, attendance, assessment, assignment, and submission records are stored in the server-side SQLite database.</li>
+        <li>Assignment attachments and student submissions are stored in private server folders and are returned only through authenticated download routes.</li>
+        <li>The application uses an HttpOnly session cookie for authentication. The browser stores a small user display cache in <code>localStorage</code>; academic records are not stored there.</li>
       </ul>
-      <p>This data never leaves your device. Clearing your browser site data removes it completely, and the demo regenerates its default data on the next visit.</p>
+      <p>For a local development setup, the database is in <code>data/academic.sqlite</code> and uploaded files are under <code>uploads/</code>. A hosted deployment may use different storage. The operator must protect, back up, and delete stored data according to approved institutional policy.</p>
+
+      <h2>3. Browser storage and sessions</h2>
+      <p>The application stores the signed-in user's display profile under <code>mca_current_user</code> in browser storage. The authentication cookie is HttpOnly and expires after 12 hours. Use the Logout action to clear the session and display cache. Clearing site data also removes the browser cache, but does not delete records already stored on the server.</p>
 
       <h2>4. Third-party resources</h2>
       <p>The pages load open-source libraries and fonts from public CDNs (Bootstrap, Chart.js, Font Awesome via jsDelivr; Google Fonts). A request to these providers is made by your browser when a page loads, and standard web requests include technical details such as your IP address and user agent. The library code is not modified and does not collect information on our behalf. If you would rather avoid this, the files can be self-hosted with no functional changes.</p>
 
-      <h2>5. Children and sensitive data</h2>
-      <p>The demo is a classroom project and is not directed at children. Because it stores data only in your own browser, it does not process anyone else's information.</p>
+      <h2>5. Children and sensitive information</h2>
+      <p>This project is not designed for children or for handling sensitive institutional records. Use only the sample data unless the responsible institution has formally reviewed and approved the deployment.</p>
 
       <h2>6. Your choices</h2>
       <ul>
-        <li>Remove all demo data at any time: open DevTools, then Application (or Storage), and clear Local Storage for this site.</li>
-        <li>Use the site in a private/incognito window so nothing persists after you close it.</li>
+        <li>Log out when you finish using a shared device.</li>
+        <li>For a local development copy, the project operator can remove the SQLite database and upload folders to delete server-side demo data.</li>
+        <li>For a hosted copy, contact its operator to request information about data retention or deletion.</li>
       </ul>
 
-      <h2>7. If this project is ever hosted for real users</h2>
-      <p>The roadmap for this project includes connecting a real backend with proper authentication. If that ever happens, this policy will be rewritten before launch to cover account data, password hashing, session handling, data retention, and applicable Indian law (including the Digital Personal Data Protection Act, 2023). Until then, "no server, no collection" remains the accurate statement.</p>
+      <h2>7. Deployment and applicable requirements</h2>
+      <p>This policy describes the current demonstration implementation, not a complete institutional privacy program. A public deployment requires an approved operator, retention and deletion procedures, security controls, backups, and a policy reviewed for applicable Indian law, including the Digital Personal Data Protection Act, 2023. Update this notice before processing real student data.</p>
 
       <h2>8. Contact</h2>
       <p>This project was built as part of the MCA program, Department of Computer Applications, BIT Mesra. Questions can be routed through the department office.</p>

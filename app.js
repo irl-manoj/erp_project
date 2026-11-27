@@ -1,7 +1,7 @@
 /**
  * MCA Academic Dashboard - Main Controller v3 - BIT Mesra
- * Per-student per-subject attendance, multi-user login, localStorage persistence for mock DB
- * Frontend -> REST API (mock) -> JSON, persists teacher edits per student
+ * Per-student academic views and role-specific workflows.
+ * Browser -> authenticated Express API -> SQLite database and private file storage.
  */
 (function(){
   const ROLE = window.ROLE || 'student';
@@ -662,7 +662,7 @@
           <div class="col-md-6"><div class="p-3 rounded" style="background:var(--bg-soft);border:1px solid var(--border);">
             <div class="d-flex gap-2"><div style="width:38px;height:38px;border-radius:11px;background:var(--primary-100);color:var(--primary);display:grid;place-items:center;"><i class="fa-solid fa-file-${n.fileType==='pdf'?'pdf':n.fileType==='ppt'?'powerpoint':'word'}"></i></div><div class="flex-fill"><div class="fw-bold small">${esc(n.title)}</div><div class="small text-muted">${esc(n.module)} • ${esc(n.fileType.toUpperCase())} • ${esc(n.size)}</div></div></div>
             <div class="small text-muted mt-2">${esc(n.description)}</div>
-            <div class="d-flex justify-content-between align-items-center mt-2"><span class="small text-muted">${fmtDate(n.date)}</span><button class="btn btn-primary-saas btn-sm" onclick="toast('Downloading ${escAttr(n.title)} - via API fileUrl','success')"><i class="fa-solid fa-download me-1"></i>Download</button></div>
+            <div class="d-flex justify-content-between align-items-center mt-2"><span class="small text-muted">${fmtDate(n.date)}</span><button class="btn btn-ghost btn-sm" disabled title="No file has been uploaded for this note"><i class="fa-solid fa-file-circle-xmark me-1"></i>No file attached</button></div>
           </div></div>`).join('')}</div>` : '<div class="empty-state py-4"><div class="small text-muted">No notes yet for this subject</div></div>';
       const assigns = await API.getAssignments({subjectId: id});
       $('#subjectAssignments').innerHTML = assigns.length? assigns.map(a=>`
@@ -793,9 +793,9 @@
             <div class="fw-bold mt-2" style="line-height:1.3;">${esc(a.title)}</div>
             <div class="small text-muted" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(a.description)}</div>
             <div class="mt-2 small d-flex flex-wrap gap-2"><span><i class="fa-regular fa-calendar me-1"></i>Deadline ${fmtDate(a.deadline)}</span><span>• ${a.maxMarks} marks</span><span>• ${a.submissionsCount} submissions</span></div>
-            ${sub ? '<div class="mt-3 p-2 rounded" style="background:var(--bg-soft);border:1px solid var(--border);"><div class="small fw-bold">Your Submission: ' + esc(sub.fileName) + ' • ' + fmtDate(sub.submittedAt) + '</div>' + (sub.marks!==null ? '<div class="small">Marks: <span class="fw-bold">' + sub.marks + '/' + sub.maxMarks + '</span> • Feedback: ' + esc(sub.feedback||'-') + '</div>' : '<div class="small text-muted">Awaiting grading by teacher</div>') + '</div>' : ''}
+            ${sub ? '<div class="mt-3 p-2 rounded" style="background:var(--bg-soft);border:1px solid var(--border);"><div class="small fw-bold">Your Submission: ' + esc((sub.fileNames||[sub.fileName]).join(', ')) + ' • ' + fmtDate(sub.submittedAt) + '</div>' + (sub.marks!==null ? '<div class="small">Marks: <span class="fw-bold">' + sub.marks + '/' + sub.maxMarks + '</span> • Feedback: ' + esc(sub.feedback||'-') + '</div>' : '<div class="small text-muted">Awaiting grading by teacher</div>') + '</div>' : ''}
             <div class="d-flex gap-2 mt-3">
-              <button class="btn btn-ghost btn-sm flex-fill" onclick="toast('Downloading assignment file via API fileUrl','success')"><i class="fa-solid fa-download me-1"></i>Download</button>
+              ${(a.files||[]).map((file,index)=>`<button class="btn btn-ghost btn-sm" title="Download ${escAttr(file.name)}" onclick="API.downloadAssignment(${a.id},${index}).catch(e=>toast(e.message,'error'))"><i class="fa-solid fa-download me-1"></i>${esc(file.name)}</button>`).join('') || '<span class="small text-muted">No files attached</span>'}
               ${!sub||sub.status==='not_started'?`<button class="btn btn-primary-saas btn-sm flex-fill" onclick="openSubmitModal(${a.id}, '${escAttr(a.title)}')"><i class="fa-solid fa-upload me-1"></i>${sub?'Resubmit':'Submit'}</button>`:`<button class="btn btn-ghost btn-sm flex-fill" disabled><i class="fa-solid fa-check me-1"></i>${esc(status)}</button>`}
             </div>
           </div></div></div>`;
@@ -824,7 +824,7 @@
         <div class="col-md-6 col-xl-4"><div class="card-saas h-100"><div class="card-body">
           <div class="d-flex gap-3"><div style="width:42px;height:42px;border-radius:12px;background:var(--primary-100);color:var(--primary);display:grid;place-items:center;flex-shrink:0;"><i class="fa-solid fa-file-${n.fileType==='pdf'?'pdf':n.fileType==='ppt'?'powerpoint':'word'}"></i></div><div class="flex-fill"><div class="fw-bold small" style="line-height:1.3;">${esc(n.title)}</div><div class="small text-muted">${esc(n.module)} • ${esc(n.fileType.toUpperCase())} • ${esc(n.size)} • ${n.pages} pages</div></div></div>
           <div class="small text-muted mt-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(n.description)}</div>
-          <div class="d-flex justify-content-between align-items-center mt-3"><span class="small text-muted">${fmtDate(n.date)}</span><button class="btn btn-primary-saas btn-sm" onclick="toast('Downloading ${escAttr(n.title)} via API - fileUrl','success')"><i class="fa-solid fa-download me-1"></i>Download</button></div>
+          <div class="d-flex justify-content-between align-items-center mt-3"><span class="small text-muted">${fmtDate(n.date)}</span><button class="btn btn-ghost btn-sm" disabled title="No file has been uploaded for this note"><i class="fa-solid fa-file-circle-xmark me-1"></i>No file attached</button></div>
         </div></div></div>
       `).join('')}</div>`;
     }catch(e){ el.innerHTML=`<div class="card-saas p-4 text-center"><div class="fw-bold">Unable to load notes</div><div class="small text-muted">${esc(e.message)}</div></div>`; }
@@ -1019,7 +1019,7 @@
       const qSel = students.find(s=>s.id===qStudentId);
       el.innerHTML=`
         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-          <div class="quiz-offline-banner flex-fill mb-0"><i class="fa-solid fa-chalkboard-teacher"></i><div><strong>Offline class tests - teacher enters marks for ${qSel?esc(qSel.name):'student'} here.</strong> 3 tests ×15 in classroom → Best 2 auto → 30. <strong>End-Sem (out of 50): enter in the strip at the bottom of each subject card.</strong> Marks 0-15 / 0-50 validated via API. Persists via localStorage.</div></div>
+          <div class="quiz-offline-banner flex-fill mb-0"><i class="fa-solid fa-chalkboard-teacher"></i><div><strong>Classroom quizzes - enter marks for ${qSel?esc(qSel.name):'the selected student'} here.</strong> Three quizzes worth 15 marks each; the best two count toward 30. <strong>End-semester marks are entered below each subject card, out of 50.</strong> The server validates scores and saves changes to the database.</div></div>
           <select id="quizStudentSwitch" class="form-select form-select-sm" style="max-width:220px; border-radius:999px;">${students.map(s=>`<option value="${s.id}" ${s.id===qStudentId?'selected':''}>${esc(s.name)} - ${esc(s.roll)}</option>`).join('')}</select>
         </div>
         ${theories.map(s=>{
@@ -1197,7 +1197,7 @@
           </select>
           <span class="small text-muted">Every student, every subject - update and it persists for that student</span>
         </div>
-        <div class="card-saas"><div class="card-header-saas"><div><div class="fw-bold">Per-Subject Attendance for ${esc(selName)}</div><div class="small text-muted">Update Total / Attended • Attended ≤ Total • Auto % • 75% eligibility • PUT /api/attendance/:id - saves to localStorage</div></div><span class="badge rounded-pill" style="background:var(--bg-soft);border:1px solid var(--border);">${attendance.length} subjects</span></div>
+        <div class="card-saas"><div class="card-header-saas"><div><div class="fw-bold">Per-Subject Attendance for ${esc(selName)}</div><div class="small text-muted">Update total and attended classes • Attended cannot exceed total • Percentage is calculated automatically • 75% eligibility • Changes are saved to the database</div></div><span class="badge rounded-pill" style="background:var(--bg-soft);border:1px solid var(--border);">${attendance.length} subjects</span></div>
           <div class="table-responsive"><table class="table table-saas mb-0"><thead><tr><th>Subject</th><th>Code</th><th>Total</th><th>Attended</th><th>%</th><th>Status</th><th>Save</th></tr></thead><tbody>
             ${attendance.map(a=>{
               const s=subjects.find(x=>x.id===a.subjectId) || {name:'Subject '+a.subjectId, code:'', color:'#c8102e'};
@@ -1206,7 +1206,7 @@
               return `<tr><td class="small fw-bold">${esc(s.name)}</td><td class="small text-muted">${esc(s.code||'')}</td><td><input class="form-control form-control-saas form-control-sm" style="width:80px;" value="${a.totalClasses}" type="number" min="0" id="att-total-${a.subjectId}"></td><td><input class="form-control form-control-saas form-control-sm" style="width:80px;" value="${a.attendedClasses}" type="number" min="0" id="att-att-${a.subjectId}"></td><td class="${st.met?'text-success':'text-danger'} fw-bold" id="att-perc-${a.subjectId}">${perc.toFixed(1)}%</td><td><span class="badge ${st.met?'bg-success':'bg-danger'} rounded-pill" style="font-size:0.68rem;">${esc(st.label)}</span></td><td><button class="btn btn-primary-saas btn-sm" onclick="saveAtt(${a.subjectId})"><i class="fa-solid fa-check"></i> Save</button></td></tr>`;
             }).join('')}
           </tbody></table></div>
-          <div class="small text-muted p-3 d-flex flex-wrap gap-2" style="border-top:1px solid var(--border);"><span><i class="fa-solid fa-circle-info me-1"></i>Validation: Attended ≤ Total • Required 75%. Example: Aman has 68% in some subjects (below 75% warning) • Changes reflect for student instantly (localStorage).</span><button class="btn btn-ghost btn-sm ms-auto" onclick="navigator.clipboard&&navigator.clipboard.writeText('Login as '+selName+' to see updated attendance')"><i class="fa-solid fa-eye me-1"></i>How student sees it</button></div>
+          <div class="small text-muted p-3 d-flex flex-wrap gap-2" style="border-top:1px solid var(--border);"><span><i class="fa-solid fa-circle-info me-1"></i>Validation: Attended ≤ Total • Required 75%. Example: Aman has 68% in some subjects (below 75% warning) • Changes are saved to the database and visible to the student after refresh.</span><button class="btn btn-ghost btn-sm ms-auto" onclick="navigator.clipboard&&navigator.clipboard.writeText('Login as '+selName+' to see updated attendance')"><i class="fa-solid fa-eye me-1"></i>How student sees it</button></div>
         </div>
       `;
       document.getElementById('attStudentSwitch').addEventListener('change', (e)=>{
@@ -1223,7 +1223,7 @@
           const perc=calculateAttendance(att,total);
           const cell=document.getElementById(`att-perc-${sid}`);
           if(cell) cell.textContent=perc.toFixed(1)+'%';
-          toast(`Attendance for ${selName} saved - ${perc.toFixed(1)}% • Student sees it on next login / refresh (localStorage)`, 'success');
+          toast(`Attendance for ${selName} saved (${perc.toFixed(1)}%). The student will see the updated value after refresh.`, 'success');
           // teacher: refresh his faculty dashboard (no student views on this page anymore)
           loadTeacherDashboard();
         }catch(e){ toast(e.message,'error'); }
@@ -1245,7 +1245,7 @@
             <div class="d-flex justify-content-between"><span class="badge-type ${s?.type==='lab'?'badge-lab':'badge-theory'}">${esc(s?.code||'')}</span><span class="small text-muted" style="font-weight:600;">${a.maxMarks} marks</span></div>
             <div class="fw-bold mt-2">${esc(a.title)}</div><div class="small text-muted" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(a.description)}</div>
             <div class="small mt-2 text-muted"><i class="fa-regular fa-calendar me-1"></i>Deadline ${fmtDate(a.deadline)} • ${a.submissionsCount} submissions • ${esc(a.status)}</div>
-            <div class="d-flex gap-2 mt-3"><button class="btn btn-ghost btn-sm flex-fill" onclick="toast('GET /api/submissions?assignmentId=${a.id} - download student files','info')"><i class="fa-solid fa-eye me-1"></i>Submissions</button><button class="btn btn-ghost btn-sm" onclick="toast('Edit assignment via PUT /api/assignments/${a.id}','info')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-sm text-danger" onclick="toast('Delete via DELETE /api/assignments/${a.id}','info')"><i class="fa-solid fa-trash"></i></button></div>
+            <div class="d-flex gap-2 mt-3"><button class="btn btn-ghost btn-sm flex-fill" onclick="setView('teacher-submissions')"><i class="fa-solid fa-eye me-1"></i>Submissions</button>${(a.files||[]).map((file,index)=>`<button class="btn btn-ghost btn-sm" title="Download ${escAttr(file.name)}" onclick="API.downloadAssignment(${a.id},${index}).catch(e=>toast(e.message,'error'))"><i class="fa-solid fa-download"></i></button>`).join('')}<button class="btn btn-ghost btn-sm" title="Edit" onclick="editAssignment(${a.id})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-sm text-danger" title="Delete" onclick="deleteAssignment(${a.id})"><i class="fa-solid fa-trash"></i></button></div>
           </div></div></div>`;
         }).join('')}</div>
       `;
@@ -1264,7 +1264,7 @@
             ${subs.map(s=>{
               const a=assignments.find(x=>x.id===s.assignmentId);
               const stName=((window.__allStudents||[]).find(x=>x.id==s.studentId)||{}).name || (s.studentId===101?'Manoj Kumar Das':s.studentId===102?'Priya Sharma':s.studentId===103?'Aman Verma':s.studentId===104?'Neha Singh':'Student '+s.studentId);
-              return `<tr><td class="small fw-bold">${esc(a?.title||'')}</td><td class="small">${esc(stName)}</td><td class="small"><i class="fa-solid fa-file me-1 text-muted"></i>${esc(s.fileName)}</td><td class="small">${fmtDate(s.submittedAt)}</td><td><span class="badge rounded-pill" style="background:${s.status==='checked'?'#dcfce7':s.status==='submitted'?'#e2e8f0':s.status==='late'?'#fee2e2':'#f1f5f9'};color:${s.status==='checked'?'#166534':s.status==='submitted'?'#334155':s.status==='late'?'#991b1b':'#475569'};">${esc(s.status)}</span></td><td class="small fw-bold">${s.marks!==null?`${s.marks}/${s.maxMarks}`:'-'}</td><td><div class="d-flex gap-1"><button class="btn btn-primary-saas btn-sm" title="Grade" onclick="openGradeModal(${s.id})"><i class="fa-solid fa-pen"></i></button><button class="btn btn-ghost btn-sm" title="Download" onclick="toast('Downloading ${escAttr(s.fileName)} via API','success')"><i class="fa-solid fa-download"></i></button></div></td></tr>`;
+              return `<tr><td class="small fw-bold">${esc(a?.title||'')}</td><td class="small">${esc(stName)}</td><td class="small"><i class="fa-solid fa-file me-1 text-muted"></i>${esc((s.fileNames||[s.fileName]).join(', '))}</td><td class="small">${fmtDate(s.submittedAt)}</td><td><span class="badge rounded-pill" style="background:${s.status==='checked'?'#dcfce7':s.status==='submitted'?'#e2e8f0':s.status==='late'?'#fee2e2':'#f1f5f9'};color:${s.status==='checked'?'#166534':s.status==='submitted'?'#334155':s.status==='late'?'#991b1b':'#475569'};">${esc(s.status)}</span></td><td class="small fw-bold">${s.marks!==null?`${s.marks}/${s.maxMarks}`:'-'}</td><td><div class="d-flex gap-1"><button class="btn btn-primary-saas btn-sm" title="Grade" onclick="openGradeModal(${s.id})"><i class="fa-solid fa-pen"></i></button>${(s.files||[]).map((file,index)=>`<button class="btn btn-ghost btn-sm" title="Download ${escAttr(file.name)}" onclick="API.downloadSubmission(${s.id},${index}).catch(e=>toast(e.message,'error'))"><i class="fa-solid fa-download"></i></button>`).join('')}</div></td></tr>`;
             }).join('') || '<tr><td colspan="7" class="text-center small text-muted p-4">No submissions yet</td></tr>'}
           </tbody></table></div>
         </div>
@@ -1282,13 +1282,15 @@
   async function handleSubmitAssignment(e){
     e.preventDefault();
     const id=parseInt($('#submitAssignmentId').value);
-    const file=$('#submitFile').files[0];
-    if(!file){ toast('Please choose a file to upload','error'); return; }
+    const files=Array.from($('#submitFile').files||[]);
+    if(!files.length){ toast('Select at least one file to upload','error'); return; }
+    if(files.length>10){ toast('Select no more than 10 files','error'); return; }
+    if(files.some(file=>file.size>15*1024*1024)){ toast('Each file must be 15 MB or smaller','error'); return; }
     const btn=e.target.querySelector('button[type="submit"]');
     const orig=btn.innerHTML; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Uploading...'; btn.disabled=true;
     try{
-      await API.createSubmission({assignmentId:id, studentId:State.studentId, fileName:file.name, maxMarks:20});
-      toast('✓ Assignment submitted successfully via POST /api/submissions','success');
+      await API.createSubmission({assignmentId:id, files});
+      toast(`✓ ${files.length} file${files.length===1?'':'s'} submitted successfully`,'success');
       bootstrap.Modal.getInstance($('#submitModal')).hide();
       e.target.reset();
       const d=$('#fileNameDisplay'); if(d) d.textContent='';
@@ -1349,11 +1351,12 @@
     };
     if(!payload.name || !payload.code){ toast('Name and Code are required','error'); return; }
     if(!payload.credits || payload.credits<=0){ toast('Credits must be positive (1-10)','error'); return; }
+    const subjectId=fd.get('id');
     const btn=e.target.querySelector('button[type="submit"]');
-    const orig=btn.innerHTML; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Creating...'; btn.disabled=true;
+    const orig=btn.innerHTML; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; btn.disabled=true;
     try{
-      const created=await API.createSubject(payload);
-      toast(`✓ Subject "${created.name}" created (${created.code}) - via POST /api/subjects`,'success');
+      const created=subjectId ? await API.updateSubject(subjectId,payload) : await API.createSubject(payload);
+      toast(`✓ Subject "${created.name}" saved (${created.code})`,'success');
       bootstrap.Modal.getInstance($('#addSubjectModal')).hide();
       e.target.reset();
       // refresh views
@@ -1374,6 +1377,10 @@
       deadline: fd.get('deadline'),
       status: 'pending'
     };
+    const files=Array.from(fd.getAll('files')).filter(file=>file instanceof File && file.size>0);
+    if(files.length>10){ toast('Select no more than 10 files','error'); return; }
+    if(files.some(file=>file.size>15*1024*1024)){ toast('Each file must be 15 MB or smaller','error'); return; }
+    if(files.length) payload.files=files;
     if(!payload.title){ toast('Title required','error'); return; }
     if(!payload.deadline){ toast('Deadline required','error'); return; }
     const btn=e.target.querySelector('button[type="submit"]');
@@ -1387,42 +1394,54 @@
     }catch(err){ toast(err.message,'error'); }
     finally{ btn.innerHTML=orig; btn.disabled=false; }
   }
+  window.editAssignment=async(id)=>{
+    try{
+      const assignment=(await API.getAssignments({})).find(item=>item.id===id);
+      if(!assignment) throw new Error('Assignment not found');
+      const title=prompt('Assignment title:',assignment.title);
+      if(title===null) return;
+      if(!title.trim()){ toast('Title is required','error'); return; }
+      const description=prompt('Assignment instructions:',assignment.description||'');
+      if(description===null) return;
+      await API.updateAssignment(id,{title:title.trim(),description});
+      toast('Assignment updated and saved to the database','success');
+      await loadTeacherAssignments();
+    }catch(error){ toast(error.message||'Could not update assignment','error'); }
+  };
+  window.deleteAssignment=async(id)=>{
+    if(!confirm('Delete this assignment?')) return;
+    try{ await API.deleteAssignment(id); toast('Assignment deleted','success'); await loadTeacherAssignments(); }
+    catch(error){ toast(error.message||'Could not delete assignment','error'); }
+  };
   window.deleteSubject=async(id)=>{
     if(!confirm('Delete this subject? This will remove it for all students (via DELETE /api/subjects/'+id+').')) return;
     try{ await API.deleteSubject(id); toast('Subject deleted via DELETE /api/subjects','success'); await loadTeacherSubjects(); await loadSubjectsView(); }catch(e){ toast(e.message,'error'); }
   };
-  window.editSubject=(id)=>{
-    toast('Edit: would open pre-filled form and PUT /api/subjects/'+id+' - demo shows toast. Try Add Subject for full flow.','info');
-    // For demo, just open attendance modal as placeholder? No, show info
+  window.editSubject=async(id)=>{
+    try{
+      const subject=await API.getSubject(id);
+      const form=$('#addSubjectForm');
+      if(!form) return;
+      form.elements.name.value=subject.name||'';
+      form.elements.code.value=subject.code||'';
+      form.elements.faculty.value=subject.faculty||'';
+      form.elements.semester.value=String(subject.semester||1);
+      form.elements.credits.value=subject.credits||1;
+      form.elements.type.value=subject.type||'theory';
+      form.querySelector('[name="id"]').value=subject.id;
+      $('#subjectModalTitle').innerHTML='<i class="fa-solid fa-pen me-2 text-primary"></i>Edit Subject';
+      $('#subjectSubmitButton').innerHTML='<i class="fa-solid fa-check me-1"></i>Save Changes';
+      new bootstrap.Modal($('#addSubjectModal')).show();
+    }catch(error){ toast(error.message||'Unable to load subject','error'); }
   };
   window.viewStudent=(id)=>{ toast('Viewing student via GET /api/marks?studentId='+id+' & GET /api/attendance?studentId='+id+' (private per §37)','info'); };
 
   function ensureAuth(){
-    // logged in with the OTHER role? warn + point to right portal, continue as demo
-    if(_persisted && _persisted.role !== ROLE){
-      const content = document.querySelector('.content');
-      if(content && !document.getElementById('authBanner')){
-        const b=document.createElement('div'); b.id='authBanner'; b.className='alert mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2';
-        b.style.cssText='background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:14px;';
-        b.innerHTML='<span><i class="fa-solid fa-user-shield me-1"></i>You are logged in as <strong>'+esc(_persisted.name)+'</strong> ('+esc(_persisted.role)+') - this is the <strong>'+ROLE+'</strong> portal. Showing demo data here.</span><a class="btn btn-sm text-white" style="background:#991b1b;text-decoration:none;padding:6px 14px;" href="../'+(_persisted.role==='teacher'?'teacher':'student')+'/dashboard.html"><i class="fa-solid fa-arrow-right me-1"></i>Go to my '+esc(_persisted.role)+' portal</a>';
-        content.prepend(b);
-      }
+    if(!State.currentUser || State.currentUser.role !== ROLE){
+      window.location.replace('login.html?role='+ROLE);
       return false;
     }
-    const u = State.currentUser;
-    if(!u){
-      // add subtle banner with login link
-      const content = document.querySelector('.content');
-      if(content && !document.getElementById('authBanner')){
-        const b = document.createElement('div');
-        b.id='authBanner';
-        b.className='alert mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2';
-        b.style.cssText='background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:14px;';
-        b.innerHTML='<span><i class="fa-solid fa-right-to-bracket me-1"></i>You are in demo mode. <a href="../index.html" class="fw-bold" style="color:#92400e;text-decoration:underline;">Login</a> as Manoj / Priya / Aman / Neha or as Teacher to see per-student data. Edits by teacher persist via localStorage.</span><button class="btn btn-sm" style="background:#92400e;color:#fff;" onclick="window.location.href=\'../index.html\'">Login with BIT Mesra</button>';
-        content.prepend(b);
-      }
-    }
-    return !!u;
+    return true;
   }
 
   function updateHeaderForUser(){
@@ -1456,7 +1475,7 @@
       b.className='btn btn-ghost btn-sm';
       b.title='Logout';
       b.innerHTML='<i class="fa-solid fa-right-from-bracket"></i> <span class="d-none d-lg-inline">Logout</span>';
-      b.onclick=()=>{ try{ localStorage.removeItem('mca_current_user'); }catch{} window.location.href='../index.html'; };
+      b.onclick=async()=>{ await API.logout(); window.location.href='index.html'; };
       topActions.appendChild(b);
     }
     // also add logout in sidebar
@@ -1466,14 +1485,33 @@
       s.id='sidebarLogout';
       s.className='btn btn-ghost btn-sm w-100 mt-2';
       s.innerHTML='<i class="fa-solid fa-right-from-bracket me-1"></i>Logout';
-      s.onclick=()=>{ try{ localStorage.removeItem('mca_current_user'); }catch{} window.location.href='../index.html'; };
+      s.onclick=async()=>{ await API.logout(); window.location.href='index.html'; };
       sideFoot.appendChild(s);
     }
   }
 
   async function init(){
-    ensureAuth();
+    try{
+      const verifiedUser = await API.getMe();
+      if(verifiedUser.role !== ROLE){
+        window.location.replace('dashboard.html?role='+verifiedUser.role);
+        return;
+      }
+      State.currentUser = verifiedUser;
+      if(verifiedUser.role === 'student') State.studentId = verifiedUser.id;
+    }catch{
+      try{ localStorage.removeItem('mca_current_user'); }catch{}
+      window.location.replace('login.html?role='+ROLE);
+      return;
+    }
+    if(!ensureAuth()) return;
     updateHeaderForUser();
+    document.querySelectorAll('[data-teacher-only]').forEach(el=>{ if(!el.classList.contains('view-section')) el.classList.toggle('d-none', ROLE!=='teacher'); });
+    document.querySelectorAll('[data-student-only]').forEach(el=>el.classList.toggle('d-none', ROLE!=='student'));
+    const dashboardTitle=document.querySelector('[data-view="dashboard"] .page-title');
+    if(dashboardTitle) dashboardTitle.textContent=ROLE==='student'?'Student Dashboard':'Faculty Dashboard';
+    const dashboardSubtitle=document.querySelector('[data-view="dashboard"] .page-subtitle');
+    if(dashboardSubtitle) dashboardSubtitle.textContent=ROLE==='student'?'Your subjects, attendance, marks, assignments and academic progress':'Manage students, attendance, marks, assignments and submissions';
     // teacher: populate student picker state
     if(State.role==='teacher'){
       try{
@@ -1490,9 +1528,9 @@
     if(mobileToggle) mobileToggle.addEventListener('click', toggleSidebar);
     if(overlay) overlay.addEventListener('click', toggleSidebar);
     $$('.sidebar .nav-link').forEach(a=> a.addEventListener('click', e=>{
-      e.preventDefault();
-      const v=a.dataset.view; if(v) setView(v);
-      if(window.innerWidth<992 && sidebar?.classList.contains('show')) toggleSidebar();
+      const v=a.dataset.view;
+      if(v){ e.preventDefault(); setView(v); }
+      if(v && window.innerWidth<992 && sidebar?.classList.contains('show')) toggleSidebar();
     }));
     const themeBtn=$('#themeToggle'); if(themeBtn) themeBtn.addEventListener('click', toggleTheme);
     const sInput=$('#globalSearch');
@@ -1510,7 +1548,15 @@
         c.innerHTML=notifs.map(n=>`<div class="p-2 small" style="border-bottom:1px solid var(--border);background:${n.read?'transparent':'var(--primary-50)'};"><div class="fw-bold small">${esc(n.title)}</div><div class="text-muted" style="font-size:0.82rem;">${esc(n.message)}</div><div class="text-muted" style="font-size:0.72rem;">${esc(n.time)}</div></div>`).join('') || '<div class="p-3 small text-muted">No notifications</div>';
       }catch{}
     });
-    const addSubjectForm=$('#addSubjectForm'); if(addSubjectForm) addSubjectForm.addEventListener('submit', handleAddSubject);
+    const addSubjectForm=$('#addSubjectForm');
+    if(addSubjectForm){
+      addSubjectForm.addEventListener('submit', handleAddSubject);
+      $('#addSubjectModal')?.addEventListener('hidden.bs.modal',()=>{
+        addSubjectForm.reset(); addSubjectForm.querySelector('[name="id"]').value='';
+        $('#subjectModalTitle').innerHTML='<i class="fa-solid fa-book me-2 text-primary"></i>Add Subject';
+        $('#subjectSubmitButton').innerHTML='<i class="fa-solid fa-plus me-1"></i>Create Subject';
+      });
+    }
     const addAssignmentForm=$('#addAssignmentForm'); if(addAssignmentForm) addAssignmentForm.addEventListener('submit', handleAddAssignment);
     const submitForm=$('#submitForm'); if(submitForm) submitForm.addEventListener('submit', handleSubmitAssignment);
     const gradeForm=$('#gradeForm'); if(gradeForm) gradeForm.addEventListener('submit', handleGrade);

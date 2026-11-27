@@ -248,8 +248,8 @@ const API = {
     authenticate: (identifier, role, password) => {
         const q = String(identifier || '').trim().toLowerCase();
         const pwd = String(password || '').trim();
-        if (!q) return Promise.reject({ status: 400, message: 'Email ya roll number daaliye' });
-        if (pwd.length < 1) return Promise.reject({ status: 400, message: 'Password daaliye (demo me koi bhi chalega)' });
+        if (!q) return Promise.reject({ status: 400, message: 'Enter your email address or student roll number.' });
+        if (pwd.length < 1) return Promise.reject({ status: 400, message: 'Enter your password.' });
         const pool = role === 'teacher' ? MockDB.teachers : MockDB.students;
         const u = pool.find(x => {
             const em = (x.email || '').toLowerCase(), nm = (x.name || '').toLowerCase();
@@ -258,7 +258,7 @@ const API = {
                    em.split('@')[0] === q || em.split('@')[0].split('.')[0] === q ||
                    words[0] === q || words[words.length - 1] === q;
         });
-        if (!u) return Promise.reject({ status: 404, message: 'Aisa demo account nahi mila - neeche kisi bhi demo account par click karke try karein' });
+        if (!u) return Promise.reject({ status: 404, message: 'Account not found. Choose one of the listed demo accounts or check your credentials.' });
         try { if (typeof localStorage !== 'undefined') localStorage.setItem('mca_current_user', JSON.stringify(u)); } catch {}
         return simulateFetch(u, { noFail: true });
     },
