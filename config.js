@@ -3,7 +3,7 @@
  * BIT Mesra - Centralized API configuration
  */
 const CONFIG = {
-    API_BASE_URL: "https://api.mca-dashboard.edu/api",
+    API_BASE_URL: "/api",
     API_VERSION: "v1",
     APP_NAME: "MCA Academic Dashboard",
     COLLEGE_NAME: "Birla Institute of Technology, Mesra",
@@ -25,6 +25,6 @@ const CONFIG = {
     ENDSEM_MAX: 50,
     SEMESTERS: [1, 2, 3, 4],
     MOCK_DELAY: 400,
-    ENABLE_MOCK_API: true
+    ENABLE_MOCK_API: false
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = CONFIG;
