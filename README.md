@@ -27,12 +27,12 @@ All seeded demo accounts use password **`1234`** in local development. Use the m
 | Teacher | `rajesh.kumar@bitmesra.ac.in` | — |
 | Teacher | `anjali.mehta@bitmesra.ac.in` | — |
 
-The demo password is only for the included sample accounts. The server stores **bcrypt password hashes**, never plaintext passwords. On the first startup it creates `data/academic.sqlite` and seeds the sample users and academic records. Database and uploaded files are ignored by Git.
+The demo password is only for the included sample accounts. The login page links to account registration: students can register with a unique roll number, email, semester, and password. Teacher registration requires the private `TEACHER_REGISTRATION_CODE` in `.env`; without it, public teacher sign-up stays disabled. The server stores **bcrypt password hashes**, never plaintext passwords. On first startup it creates `data/academic.sqlite` and seeds sample users and academic records. Database and uploaded files are ignored by Git.
 
 ## What is connected to the backend
 
 - **Authentication:** email/roll + password, role-bound login, 12-hour signed session in an HttpOnly cookie, a short-lived bearer-token fallback for embedded preview browsers, logout, and login rate limiting.
-- **Authorization:** student accounts can only read their own profile, attendance, marks, and submissions; teacher accounts can see the class roster and make teacher-only changes. The server enforces this even if a client changes IDs or roles.
+- **Authorization:** students can read only their own profile, attendance, marks, and submissions. Teacher access is scoped server-side to subjects assigned to that teacher; teachers cannot read or edit another teacher’s subject marks, assignments, or submissions. A teacher may see student profiles only for semesters in which they teach. Changing client IDs or roles does not bypass these checks.
 - **Persisted records:** students/teachers, subjects, attendance, quizzes, internal and end-semester marks, lab marks, assignments, submissions, exams, notes, notices, syllabus and notifications are stored in SQLite.
 - **Teacher actions:** create/update/delete subjects; edit attendance and assessment marks; create assignments; review and grade submissions.
 - **Student actions:** view their academic dashboard and upload up to 10 assignment-submission files per submission. Each file can be up to 15 MB and is saved in `uploads/submissions/`; downloads are limited to the owning student or a teacher.
@@ -52,7 +52,7 @@ Health check: `GET /api/health`.
 
 ## Configuration and deployment notes
 
-Copy `.env.example` to `.env` and set a long random `JWT_SECRET`. Set `NODE_ENV=production` to enable secure cookies; the server then requires `JWT_SECRET` and `DEMO_PASSWORD` on the **first database seed**. Change the sample password for a production deployment and provision real institutional accounts instead of exposing demo accounts.
+Copy `.env.example` to `.env` and set a long random `JWT_SECRET`. Set a private `TEACHER_REGISTRATION_CODE` only when you want to allow invited teachers to register; students can register without an invitation. Set `NODE_ENV=production` and serve over HTTPS (session cookies are always Secure); the server requires `JWT_SECRET` and `DEMO_PASSWORD` on the **first database seed**. Change sample passwords for a production deployment and provision real institutional accounts instead of exposing demo accounts.
 
 SQLite is a good fit for local development and a single-instance demo. For hosting, use a persistent disk/volume for both the SQLite database and `uploads/`; ephemeral container filesystems lose data when redeployed. For multiple app instances or a larger production deployment, migrate the records to PostgreSQL and use durable object storage for uploads. Production deployment also needs HTTPS, backups, a domain, and institutional account/password management.
 

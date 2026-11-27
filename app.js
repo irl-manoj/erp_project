@@ -1359,6 +1359,7 @@
       toast(`✓ Subject "${created.name}" saved (${created.code})`,'success');
       bootstrap.Modal.getInstance($('#addSubjectModal')).hide();
       e.target.reset();
+      if(State.currentUser?.role==='teacher' && e.target.elements.faculty) e.target.elements.faculty.value=State.currentUser.name;
       // refresh views
       if(State.role==='teacher'){ await loadTeacherSubjects(); await loadTeacherDashboard(); } else { await loadSubjectsView(); await loadDashboard(); }
       // switch to subjects to show new one
@@ -1453,6 +1454,9 @@
       if(rEl) rEl.textContent = State.role==='student' ? 'MCA/2024/017 • Sem 1 • Demo' : 'Teacher • Demo';
       return;
     }
+    // Subject ownership is bound to the authenticated faculty account, not form input.
+    const facultyInput=$('#addSubjectForm [name="faculty"]');
+    if(facultyInput && u.role==='teacher') facultyInput.value=u.name;
     // update topbar name/role
     if(nEl) nEl.textContent = u.name;
     if(rEl) {

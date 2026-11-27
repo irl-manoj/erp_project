@@ -25,6 +25,13 @@
     }
     return headers;
   }
+  function storeSession(result) {
+    memoryToken = result.accessToken;
+    try { localStorage.setItem(USER_KEY, JSON.stringify(result.user)); } catch {}
+    try { sessionStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
+    try { localStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
+    return result.user;
+  }
   function clearSession() {
     memoryToken = null;
     try { localStorage.removeItem(USER_KEY); } catch {}
@@ -63,11 +70,11 @@
   const API = {
     authenticate: async (identifier, role, password) => {
       const result = await request('/auth/login', { method: 'POST', body: JSON.stringify({ identifier, role, password }) });
-      memoryToken = result.accessToken;
-      try { localStorage.setItem(USER_KEY, JSON.stringify(result.user)); } catch {}
-      try { sessionStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
-      try { localStorage.setItem(TOKEN_KEY, result.accessToken); } catch {}
-      return result.user;
+      return storeSession(result);
+    },
+    register: async payload => {
+      const result = await request('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
+      return storeSession(result);
     },
     login: async (userId) => {
       const user = await request(`/students/${encodeURIComponent(userId)}`);

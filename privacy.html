@@ -42,7 +42,7 @@
 
       <h2>2. Information processed by the application</h2>
       <ul>
-        <li>Login identifiers and passwords are sent to the same-origin API for verification. Passwords are stored as bcrypt hashes, not plaintext.</li>
+        <li>Login identifiers and passwords are sent to the same-origin API for verification. Passwords are stored as bcrypt hashes, not plaintext. New students may register with their name, institutional email, roll number, semester, and password. Teacher accounts require an administrator-issued invitation code.</li>
         <li>Authenticated profile, attendance, assessment, assignment, and submission records are stored in the server-side SQLite database.</li>
         <li>Assignment attachments and student submissions are stored in private server folders and are returned only through authenticated download routes.</li>
         <li>The application uses a signed, 12-hour HttpOnly cookie where supported, with a short-lived bearer-token fallback in <code>sessionStorage</code> and <code>localStorage</code> for embedded preview browsers. Academic records are not stored in browser storage.</li>
