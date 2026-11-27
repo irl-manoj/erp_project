@@ -46,9 +46,11 @@ const upload = multer({
 });
 
 function httpError(status, message) { const error = new Error(message); error.status = status; return error; }
-function sessionCookieOptions(req) {
-  const secure = Boolean(req.secure);
-  return { httpOnly: true, secure, sameSite: secure ? 'none' : 'lax', maxAge: 12 * 60 * 60 * 1000, path: '/' };
+function sessionCookieOptions(_req) {
+  // The browser-facing app is HTTPS, even when a preview proxy talks HTTP to Express.
+  // Always issue a cross-site-capable secure cookie so preview proxy headers cannot
+  // accidentally downgrade it to SameSite=Lax and make the session disappear.
+  return { httpOnly: true, secure: true, sameSite: 'none', maxAge: 12 * 60 * 60 * 1000, path: '/' };
 }
 function auth(req, _res, next) {
   const authorization = req.get('authorization') || '';
