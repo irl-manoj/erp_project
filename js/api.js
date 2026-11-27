@@ -17,7 +17,12 @@
   function sessionHeaders() {
     const headers = new Headers();
     const token = readToken();
-    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+      // Some embedded proxies remove Authorization; this same-origin fallback carries
+      // the same signed token in a non-special header.
+      headers.set('X-Session-Token', token);
+    }
     return headers;
   }
   function clearSession() {

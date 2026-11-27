@@ -55,7 +55,8 @@ function sessionCookieOptions(_req) {
 function auth(req, _res, next) {
   const authorization = req.get('authorization') || '';
   const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
-  const tokens = [...new Set([bearer, req.cookies[COOKIE_NAME]].filter(Boolean))];
+  const sessionHeader = req.get('x-session-token');
+  const tokens = [...new Set([bearer, sessionHeader, req.cookies[COOKIE_NAME]].filter(Boolean))];
   if (!tokens.length) return next(httpError(401, 'Please log in to continue.'));
 
   // Embedded browsers can retain an expired cookie while sending a fresh bearer token.

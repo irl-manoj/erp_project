@@ -65,6 +65,11 @@ test('student and teacher passwords are verified and role-bound', async () => {
   });
   assert.equal(staleCookieWithBearer.status, 200);
   assert.equal((await staleCookieWithBearer.json()).user.id, 101);
+  const customSessionHeader = await fetch(`${base}/api/auth/me`, {
+    headers: { 'x-session-token': student.data.accessToken }
+  });
+  assert.equal(customSessionHeader.status, 200);
+  assert.equal((await customSessionHeader.json()).user.id, 101);
   const teacher = await login('rajesh.kumar@bitmesra.ac.in', 'teacher');
   assert.equal(teacher.response.status, 200);
   assert.equal(teacher.data.user.role, 'teacher');

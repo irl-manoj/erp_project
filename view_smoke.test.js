@@ -23,7 +23,7 @@ test('browser loads real API client and verifies the server session before dashb
   const client = read('js/api.js');
   const app = read('app.js');
   const login = read('login.html');
-  assert.match(html, /src="js\/api\.js\?v=loginfix3"/);
+  assert.match(html, /src="js\/api\.js\?v=loginfix4"/);
   assert.match(client, /fetch\(/);
   assert.match(client, /\/auth\/login/);
   assert.match(client, /\/auth\/me/);
@@ -46,7 +46,9 @@ test('login bearer token survives blocked sessionStorage and a page reload', asy
   };
   const user = { id: 101, role: 'student' };
   let requestAuthorization = null;
+  let lastHeaders = null;
   const fetch = async (_url, options) => {
+    lastHeaders = options.headers;
     requestAuthorization = options.headers.get('Authorization');
     const isLogin = _url.endsWith('/auth/login');
     const body = isLogin ? { user, accessToken: 'test-access-token' } : { user };
@@ -66,9 +68,11 @@ test('login bearer token survives blocked sessionStorage and a page reload', asy
   await loginClient.authenticate('manoj.das@bitmesra.ac.in', 'student', '1234');
   await loginClient.getMe();
   assert.equal(requestAuthorization, 'Bearer test-access-token');
+  assert.equal(lastHeaders.get('X-Session-Token'), 'test-access-token');
 
   requestAuthorization = null;
   const reloadedClient = makeClient();
   await reloadedClient.getMe();
   assert.equal(requestAuthorization, 'Bearer test-access-token');
+  assert.equal(lastHeaders.get('X-Session-Token'), 'test-access-token');
 });
