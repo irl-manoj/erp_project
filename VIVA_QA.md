@@ -32,7 +32,7 @@ No. It is an educational demonstration. Bundled accounts, marks, attendance, and
 
 **7. How does login work?**
 
-The server finds the account by email or student roll number, compares the submitted password with a bcrypt hash, and issues a signed, 12-hour HttpOnly session cookie. The selected role must match the account.
+The server finds the account by email or student roll number, compares the submitted password with a bcrypt hash, and issues a signed, 12-hour session. It uses an HttpOnly cookie where available and a short-lived bearer-token fallback for embedded previews. The selected role must match the account.
 
 **8. Are passwords stored in plaintext?**
 

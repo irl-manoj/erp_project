@@ -1501,6 +1501,7 @@
       if(verifiedUser.role === 'student') State.studentId = verifiedUser.id;
     }catch{
       try{ localStorage.removeItem('mca_current_user'); }catch{}
+      try{ sessionStorage.removeItem('mca_access_token'); }catch{}
       window.location.replace('login.html?role='+ROLE);
       return;
     }

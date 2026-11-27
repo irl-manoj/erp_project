@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const root = __dirname;
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
@@ -21,9 +22,57 @@ test('browser loads real API client and verifies the server session before dashb
   const html = read('dashboard.html');
   const client = read('js/api.js');
   const app = read('app.js');
-  assert.match(html, /src="js\/api\.js"/);
+  const login = read('login.html');
+  assert.match(html, /src="js\/api\.js\?v=loginfix4"/);
   assert.match(client, /fetch\(/);
   assert.match(client, /\/auth\/login/);
   assert.match(client, /\/auth\/me/);
+  assert.match(client, /Authorization/);
+  assert.match(login, /await API\.getMe\(\)/);
   assert.match(app, /await API\.getMe\(\)/);
+});
+
+test('login bearer token survives blocked sessionStorage and a page reload', async () => {
+  const values = new Map();
+  const localStorage = {
+    getItem: key => values.get(key) || null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  };
+  const sessionStorage = {
+    getItem: () => { throw new Error('sessionStorage unavailable'); },
+    setItem: () => { throw new Error('sessionStorage unavailable'); },
+    removeItem: () => { throw new Error('sessionStorage unavailable'); }
+  };
+  const user = { id: 101, role: 'student' };
+  let requestAuthorization = null;
+  let lastHeaders = null;
+  const fetch = async (_url, options) => {
+    lastHeaders = options.headers;
+    requestAuthorization = options.headers.get('Authorization');
+    const isLogin = _url.endsWith('/auth/login');
+    const body = isLogin ? { user, accessToken: 'test-access-token' } : { user };
+    return { ok: true, headers: { get: () => 'application/json' }, json: async () => body };
+  };
+  const makeClient = () => {
+    const context = {
+      window: { CONFIG: { API_BASE_URL: '/api' } },
+      location: { pathname: '/login.html' },
+      localStorage, sessionStorage, fetch, Headers, FormData, URLSearchParams
+    };
+    vm.runInNewContext(read('js/api.js'), context);
+    return context.window.API;
+  };
+
+  const loginClient = makeClient();
+  await loginClient.authenticate('manoj.das@bitmesra.ac.in', 'student', '1234');
+  await loginClient.getMe();
+  assert.equal(requestAuthorization, 'Bearer test-access-token');
+  assert.equal(lastHeaders.get('X-Session-Token'), 'test-access-token');
+
+  requestAuthorization = null;
+  const reloadedClient = makeClient();
+  await reloadedClient.getMe();
+  assert.equal(requestAuthorization, 'Bearer test-access-token');
+  assert.equal(lastHeaders.get('X-Session-Token'), 'test-access-token');
 });

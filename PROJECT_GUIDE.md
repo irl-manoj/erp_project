@@ -8,7 +8,7 @@ The MCA Academic Dashboard is an educational student and teacher portal. It demo
 
 - **Frontend:** HTML, CSS, JavaScript, Bootstrap, Chart.js, and Font Awesome.
 - **Backend:** Node.js and Express.
-- **Authentication:** bcrypt password hashes and signed 12-hour HttpOnly session cookies.
+- **Authentication:** bcrypt password hashes, signed 12-hour HttpOnly session cookies, and a short-lived bearer-token fallback for embedded previews.
 - **Database:** SQLite, initialized from the sample records in `api.js` on first startup.
 - **Uploads:** Multer stores files in private `uploads/assignments/` and `uploads/submissions/` folders. Up to 10 files can be sent per upload, at 15 MB per file.
 
@@ -22,7 +22,7 @@ Browser pages
   -> private upload folders for uploaded file content
 ```
 
-The browser keeps only a user display cache in `localStorage`. It does not store the academic database. Every protected API request is authorized on the server; changing a role or student ID in the browser does not grant additional access.
+The browser stores a small user display cache and a short-lived session fallback token; it does not store the academic database. Every protected API request is authorized on the server, so changing a role or student ID in the browser does not grant additional access.
 
 ## Roles and main workflows
 
